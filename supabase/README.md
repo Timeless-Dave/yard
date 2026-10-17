@@ -17,6 +17,12 @@ and Divine Nine plot claims, connect a free Supabase project:
    - `002_economy.sql` — Yard Coin wallets, `earn_coins`/`spend_coins`
      functions (capped server-side so a client can't mint coins), and the
      `leaderboard_view`.
+   - `003_voting.sql` — Homecoming King/Queen nominations, one vote per
+     category per user, live tallies.
+   - `004_membership.sql` — org membership rosters (one org per person) and
+     Probate Night sign-ups. This only models the public, celebratory side
+     of NPHC life — there is no pledge-process or ritual content anywhere
+     in this app, by design.
 5. In the `uapb-yard/` folder, create a file named `.env.local`:
 
    ```
