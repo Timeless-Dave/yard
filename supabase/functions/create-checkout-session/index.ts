@@ -43,6 +43,10 @@ Deno.serve(async (req) => {
     if (itemError || !item) throw new Error("item not found");
     if (!item.price_cents) throw new Error("this item is not cash-priced");
 
+    const chargeCents = item.discount_pct
+      ? Math.round(item.price_cents * (1 - item.discount_pct / 100))
+      : item.price_cents;
+
     const siteUrl = Deno.env.get("SITE_URL") ?? "http://localhost:5173";
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
@@ -50,7 +54,7 @@ Deno.serve(async (req) => {
         {
           price_data: {
             currency: "usd",
-            unit_amount: item.price_cents,
+            unit_amount: chargeCents,
             product_data: { name: item.name },
           },
           quantity: 1,

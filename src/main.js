@@ -10,6 +10,7 @@ import { mountPlotClaim } from "./minigames/plotClaim.js";
 import { mountLeaderboard } from "./minigames/leaderboard.js";
 import { mountVoting } from "./minigames/voting.js";
 import { mountStore } from "./minigames/store.js";
+import { isHalloween } from "./seasonal.js";
 import { BUILDINGS, REAL_RECREATION, RETAIL_NEAR_UNION, FICTIONAL_RECREATION } from "./campusData.js";
 import { mountAuthModal } from "./authModal.js";
 import { onAuthChange } from "./auth.js";
@@ -413,6 +414,32 @@ const throne = new THREE.Mesh(
 throne.position.set(0, 0.3, 0);
 throne.castShadow = true;
 scene.add(throne);
+
+// ---- Seasonal: Halloween "Harvest Bash" decorations ----
+function createPumpkin(x, z) {
+  const body = new THREE.Mesh(
+    new THREE.SphereGeometry(0.6, 12, 10),
+    new THREE.MeshStandardMaterial({ color: 0xe8701a })
+  );
+  body.scale.y = 0.8;
+  body.position.set(x, 0.5, z);
+  body.castShadow = true;
+  const stem = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.1, 0.14, 0.35, 6),
+    new THREE.MeshStandardMaterial({ color: 0x2f7a3a })
+  );
+  stem.position.set(x, 1.05, z);
+  scene.add(body, stem);
+}
+if (isHalloween()) {
+  const pumpkinSpots = [
+    [4, 2], [-4, 2], [4, -2], [-4, -2],
+    [-62, -24], [-58, -24], [-58, -19],
+  ];
+  pumpkinSpots.forEach(([x, z]) => createPumpkin(x, z));
+  const banner = document.getElementById("announce-banner");
+  if (banner) banner.innerHTML = '🎃 <b>@GoldenLion_23</b>: Harvest Bash is live — check the store for the Halloween drop';
+}
 
 // ---- Trees (scattered, avoiding the Bell Tower plaza and building footprints) ----
 function createTree(x, z) {
