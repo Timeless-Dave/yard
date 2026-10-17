@@ -36,6 +36,7 @@
         cursor: pointer; white-space: nowrap;
       }
       .chip:hover { border-color: var(--gold); }
+      .chip.chip-active { background: var(--gold); color: var(--black); border-color: var(--gold); }
       .auth-row { display: flex; gap: 8px; }
       .btn {
         padding: 9px 18px; border-radius: 999px; border: none; font-weight: 700;
@@ -228,6 +229,8 @@
           <div class="chip" data-modal="community">📌 Corkboard</div>
           <div class="chip" data-modal="leaderboard">🏅 Leaderboard</div>
           <div class="chip" data-modal="store">🛍️ Store</div>
+          <div class="chip" data-modal="parties">🎉 Parties</div>
+          <div class="chip" id="night-toggle">🌙 Night Mode</div>
         </div>
         <div class="auth-row">
           <div class="chip hidden" id="wallet-badge">🪙 0</div>
