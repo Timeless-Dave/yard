@@ -1,3 +1,6 @@
+import { earnCoins } from "../economy.js";
+
+const GRADE_COINS = { S: 100, A: 70, B: 40, C: 15 };
 const ARROWS = [
   { key: "arrowup", sym: "↑" },
   { key: "arrowdown", sym: "↓" },
@@ -112,6 +115,11 @@ export function mountStepShow(root, { onClose } = {}) {
     again.addEventListener("click", () => mountStepShow(root, { onClose }));
     root.querySelector(".game-modal").insertBefore(again, root.querySelector(".close"));
     root.querySelectorAll(".step-btn").forEach((b) => (b.disabled = true));
+
+    const coins = GRADE_COINS[grade];
+    earnCoins(coins, "stepshow grade " + grade).then((r) => {
+      if (r.ok) logEl.innerHTML += ` <br/>+${coins} 🪙 (${r.balance} total)`;
+    });
     window.removeEventListener("keydown", onKey);
   }
 

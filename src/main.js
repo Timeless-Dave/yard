@@ -12,6 +12,7 @@ import { mountAuthModal } from "./authModal.js";
 import { onAuthChange } from "./auth.js";
 import { ONLINE } from "./supabase.js";
 import { joinPresence, leavePresence, updateMyPosition, setMyIdentity, onPeersChange } from "./multiplayer.js";
+import { watchWallet, stopWatchingWallet, onBalanceChange } from "./economy.js";
 
 const UAPB_GOLD = 0xf4b223;
 const UAPB_BLACK = 0x121212;
@@ -646,10 +647,22 @@ onAuthChange(async (state) => {
   if (state.user) {
     await joinPresence(state.user.id, state.profile);
     setMyIdentity(state.profile?.display_name || "Golden Lion", state.profile?.color || "#f4b223");
+    watchWallet(state.user.id);
   } else {
     leavePresence();
+    stopWatchingWallet();
   }
   updatePlayerCountLabel();
+});
+
+const walletBadgeEl = document.getElementById("wallet-badge");
+onBalanceChange((balance) => {
+  if (!ONLINE || !authUser) {
+    walletBadgeEl.classList.add("hidden");
+    return;
+  }
+  walletBadgeEl.classList.remove("hidden");
+  walletBadgeEl.textContent = `🪙 ${balance}`;
 });
 
 onPeersChange((updated) => {

@@ -10,10 +10,13 @@ and Divine Nine plot claims, connect a free Supabase project:
 3. In **Authentication → Providers**, make sure **Email** is enabled. For the
    passwordless magic-link flow, also turn on **Email OTP / Magic Link**
    under Authentication → Email templates (on by default for new projects).
-4. In **SQL Editor → New query**, paste the contents of `supabase/schema.sql`
-   from this repo and run it. That creates `profiles`, `corkboard_posts`,
-   and `plot_claims`, with row-level security policies, and turns on
-   realtime for the corkboard and plot claims.
+4. In **SQL Editor → New query**, run each file in `supabase/migrations/`
+   **in order** (001, 002, ...). Each one is additive — run a new one any
+   time this repo adds another, you don't need to re-run old ones.
+   - `001_init.sql` — `profiles`, `corkboard_posts`, `plot_claims`, RLS.
+   - `002_economy.sql` — Yard Coin wallets, `earn_coins`/`spend_coins`
+     functions (capped server-side so a client can't mint coins), and the
+     `leaderboard_view`.
 5. In the `uapb-yard/` folder, create a file named `.env.local`:
 
    ```
