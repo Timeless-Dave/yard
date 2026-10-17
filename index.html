@@ -211,12 +211,81 @@
         font-weight: 700; padding: 2px 8px; border-radius: 999px; transform: translate(-50%, -100%);
         pointer-events: none; white-space: nowrap;
       }
+
+      .interact-prompt {
+        position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%);
+        background: rgba(244,178,35,0.95); color: var(--black); padding: 8px 16px;
+        border-radius: 999px; font-weight: 700; font-size: 13px; display: none; z-index: 5;
+        text-align: center; max-width: 86vw;
+      }
+      .gamepad-hint {
+        position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
+        background: rgba(61,220,132,0.95); color: var(--black); padding: 6px 14px;
+        border-radius: 999px; font-weight: 700; font-size: 12px; display: none; z-index: 6;
+      }
+
+      /* ---- Touch controls (phones / coarse pointers) ---- */
+      .touch-controls { display: none; }
+      .touch-dpad {
+        position: relative; width: 150px; height: 150px;
+      }
+      .touch-btn {
+        position: absolute; width: 50px; height: 50px; border-radius: 12px;
+        background: rgba(18,18,18,0.75); color: #fff; border: 1px solid rgba(255,255,255,0.25);
+        font-size: 20px; font-weight: 800; -webkit-user-select: none; user-select: none;
+        touch-action: none;
+      }
+      .touch-up { top: 0; left: 50px; }
+      .touch-down { top: 100px; left: 50px; }
+      .touch-left { top: 50px; left: 0; }
+      .touch-right { top: 50px; left: 100px; }
+      .touch-interact {
+        position: absolute; bottom: 36px; right: 16px; width: 64px; height: 64px;
+        border-radius: 50%; background: rgba(244,178,35,0.9); color: var(--black); font-size: 18px;
+      }
+      .touch-btn:active { background: var(--gold); color: var(--black); }
+
+      /* ---- Responsive layout ---- */
+      @media (max-width: 900px) {
+        .topbar { flex-direction: column; align-items: stretch; top: 8px; left: 8px; right: 8px; }
+        .topbar > div:first-child { display: flex; justify-content: space-between; }
+        .chip-row {
+          flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
+          padding-bottom: 4px; scrollbar-width: thin;
+        }
+        .chip { padding: 7px 11px; font-size: 12px; }
+        .auth-row { justify-content: flex-end; }
+        .announce { display: none; }
+        .hint { display: none; }
+        .bottom-card {
+          left: 8px; right: 8px; transform: none; bottom: 8px;
+          flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px;
+        }
+        .bottom-card .label { font-size: 11px; }
+        .bottom-card .btn { padding: 7px 10px; font-size: 12px; white-space: nowrap; }
+        .interact-prompt { bottom: 210px; font-size: 12px; padding: 7px 12px; }
+        .modal, .game-modal { padding: 16px; max-height: 80vh; overflow-y: auto; }
+        .store-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
+      }
+
+      @media (max-width: 900px), (pointer: coarse) {
+        .touch-controls {
+          display: flex; position: absolute; bottom: 92px; left: 16px; right: 16px;
+          justify-content: space-between; align-items: flex-end; z-index: 4; pointer-events: none;
+        }
+        .touch-controls .touch-dpad, .touch-controls .touch-interact { pointer-events: auto; }
+      }
+
+      @media (min-width: 901px) and (pointer: coarse) {
+        .touch-controls { bottom: 110px; }
+      }
     </style>
   </head>
   <body>
     <div id="app">
       <div class="topbar">
         <div class="brand"><span class="dot"></span> The Yard — UAPB</div>
+        <div class="chip" id="weather-badge" title="Live weather · Pine Bluff, AR">☀️</div>
         <div class="chip-row">
           <div class="chip" data-modal="king">🏆 Vote Mr./Miss UAPB</div>
           <div class="chip" data-modal="plots">🏠 Dorm &amp; Plot Lines</div>
@@ -250,6 +319,16 @@
         <div class="label" id="player-count-label"><b>2,847</b> Golden Lions on the Yard · free</div>
         <button class="btn btn-primary" data-modal="auth">Sign up free</button>
         <button class="btn btn-secondary" data-modal="auth">Log in</button>
+      </div>
+
+      <div class="touch-controls" id="touch-controls">
+        <div class="touch-dpad">
+          <button class="touch-btn touch-up" data-key="w">↑</button>
+          <button class="touch-btn touch-left" data-key="a">←</button>
+          <button class="touch-btn touch-down" data-key="s">↓</button>
+          <button class="touch-btn touch-right" data-key="d">→</button>
+        </div>
+        <button class="touch-btn touch-interact" id="touch-interact">E</button>
       </div>
 
       <div id="modal-root"></div>
