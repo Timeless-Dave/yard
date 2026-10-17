@@ -2,8 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>The Yard — UAPB Homecoming</title>
+    <meta name="description" content="Walk the real UAPB campus, play nostalgia minigames, and hang out with other Golden Lions." />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <meta name="theme-color" content="#121212" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="The Yard" />
     <style>
       :root {
         --gold: #f4b223;
@@ -212,6 +220,12 @@
         pointer-events: none; white-space: nowrap;
       }
 
+      .minimap {
+        position: absolute; top: 118px; right: 12px; width: 150px; height: 150px;
+        border-radius: 12px; border: 2px solid rgba(244,178,35,0.5);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.4); z-index: 3;
+      }
+
       .interact-prompt {
         position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%);
         background: rgba(244,178,35,0.95); color: var(--black); padding: 8px 16px;
@@ -266,6 +280,7 @@
         .interact-prompt { bottom: 210px; font-size: 12px; padding: 7px 12px; }
         .modal, .game-modal { padding: 16px; max-height: 80vh; overflow-y: auto; }
         .store-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
+        .minimap { width: 84px; height: 84px; top: 160px; right: 8px; }
       }
 
       @media (max-width: 900px), (pointer: coarse) {
@@ -300,6 +315,7 @@
           <div class="chip" data-modal="store">🛍️ Store</div>
           <div class="chip" data-modal="parties">🎉 Parties</div>
           <div class="chip" id="night-toggle">🌙 Night Mode</div>
+          <div class="chip hidden" id="install-chip">📲 Install App</div>
         </div>
         <div class="auth-row">
           <div class="chip hidden" id="wallet-badge">🪙 0</div>
@@ -314,6 +330,8 @@
         <b>WASD / Arrows</b> or a <b>controller</b> to walk the Yard<br/>
         Walk up to a glowing spot, press <b>E</b> / <b>A</b> to interact
       </div>
+
+      <canvas class="minimap" id="minimap" width="160" height="160"></canvas>
 
       <div class="bottom-card">
         <div class="label" id="player-count-label"><b>2,847</b> Golden Lions on the Yard · free</div>

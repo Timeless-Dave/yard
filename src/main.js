@@ -17,6 +17,7 @@ import { PARTY_SPOTS } from "./partySpots.js";
 import { startWeatherLoop, onWeatherChange } from "./weather.js";
 import { BUILDINGS, REAL_RECREATION, RETAIL_NEAR_UNION, FICTIONAL_RECREATION } from "./campusData.js";
 import { createBellTower, createAcademicHall, createModernHall, createDormHall, createStadiumComplex, createStudentUnion, createLibrary } from "./buildings.js";
+import { initMinimap } from "./minimap.js";
 import { mountAuthModal } from "./authModal.js";
 import { onAuthChange } from "./auth.js";
 import { supabase, ONLINE } from "./supabase.js";
@@ -311,6 +312,8 @@ BUILDINGS.forEach((b) => {
   // Remaining academic halls — Collegiate Gothic, à la Caldwell Hall.
   createAcademicHall(scene, { x: b.x, z: b.z, w: b.w, h: b.h, d: b.d, label: b.name, brick: b.color });
 });
+
+const minimap = initMinimap(document.getElementById("minimap"), { xMin: X_MIN, xMax: X_MAX, zMin: Z_MIN, zMax: Z_MAX, buildings: BUILDINGS });
 
 // Retail/dining kiosks near the Student Union (OSM has no interior POI data
 // for these, so they're placed just outside the real union building)
@@ -845,6 +848,7 @@ onAuthChange(async (state) => {
     await joinPresence(state.user.id, state.profile);
     setMyIdentity(state.profile?.display_name || "Golden Lion", state.profile?.color || "#f4b223");
     watchWallet(state.user.id);
+    if (state.profile?.color) torso.material.color.set(state.profile.color);
   } else {
     leavePresence();
     stopWatchingWallet();
@@ -1037,6 +1041,32 @@ function animate() {
   updateInteractionPrompt();
   updatePeerLabels();
   updateWeatherParticles(dt);
+  minimap.update({ x: avatar.position.x, z: avatar.position.z, rotY: avatar.rotation.y, peers });
   renderer.render(scene, camera);
 }
 animate();
+
+// ---- PWA install ----
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  });
+}
+
+let installPromptEvent = null;
+const installChip = document.getElementById("install-chip");
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  installPromptEvent = e;
+  if (installChip) installChip.classList.remove("hidden");
+});
+installChip?.addEventListener("click", async () => {
+  if (!installPromptEvent) return;
+  installPromptEvent.prompt();
+  await installPromptEvent.userChoice;
+  installPromptEvent = null;
+  installChip.classList.add("hidden");
+});
+window.addEventListener("appinstalled", () => {
+  installChip?.classList.add("hidden");
+});

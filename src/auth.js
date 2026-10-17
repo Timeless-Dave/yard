@@ -90,6 +90,20 @@ export async function setDisplayName(name) {
   }
 }
 
+export async function setAvatarColor(color) {
+  if (!ONLINE || !state.user) return;
+  const { data } = await supabase
+    .from("profiles")
+    .update({ color })
+    .eq("id", state.user.id)
+    .select()
+    .single();
+  if (data) {
+    state = { ...state, profile: data };
+    emit();
+  }
+}
+
 export async function signOut() {
   if (!ONLINE) return;
   await supabase.auth.signOut();

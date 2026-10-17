@@ -1,5 +1,5 @@
 import { supabase, ONLINE } from "../supabase.js";
-import { getState } from "../auth.js";
+import { getState, setAvatarColor } from "../auth.js";
 import { getBalance } from "../economy.js";
 import { getActiveSeason } from "../seasonal.js";
 
@@ -47,30 +47,40 @@ export function mountStore(root, { onClose } = {}) {
       owned = new Set((inv || []).map((i) => i.item_id));
     }
 
+    const equippedColor = getState().profile?.color;
+
     gridEl.innerHTML = "";
     items.forEach((item) => {
       const card = document.createElement("div");
       card.className = "store-card";
       const isOwned = item.kind === "cosmetic" && owned.has(item.id);
+      const isEquipped = isOwned && item.meta?.color && item.meta.color === equippedColor;
       const basePrice = item.price_coins != null ? item.price_coins : item.price_cents / 100;
       const discounted = item.discount_pct ? basePrice * (1 - item.discount_pct / 100) : basePrice;
       const fmt = (v) => (item.price_coins != null ? `🪙 ${Math.round(v)}` : `$${v.toFixed(2)}`);
       const priceHtml = item.discount_pct
         ? `<s style="opacity:0.5;">${fmt(basePrice)}</s> ${fmt(discounted)}`
         : fmt(basePrice);
+      const btnLabel = isEquipped ? "✓ Equipped" : isOwned ? "Equip" : item.price_coins != null ? "Buy" : "Checkout";
       card.innerHTML = `
         ${item.sale_label ? `<div class="store-sale-badge">${item.sale_label}</div>` : ""}
         <div class="store-icon">${item.icon}</div>
         <div class="store-name">${item.name}</div>
-        <div class="store-price">${isOwned ? "Owned" : priceHtml}</div>
-        <button class="btn ${isOwned ? "btn-secondary" : "btn-primary"}" ${isOwned ? "disabled" : ""}>
-          ${isOwned ? "✓" : item.price_coins != null ? "Buy" : "Checkout"}
+        <div class="store-price">${isOwned ? (isEquipped ? "Equipped" : "Owned") : priceHtml}</div>
+        <button class="btn ${isEquipped ? "btn-secondary" : "btn-primary"}" ${isEquipped ? "disabled" : ""}>
+          ${btnLabel}
         </button>`;
-      if (!isOwned) {
-        card.querySelector("button").addEventListener("click", () => buy(item));
+      if (!isEquipped) {
+        card.querySelector("button").addEventListener("click", () => (isOwned ? equip(item) : buy(item)));
       }
       gridEl.appendChild(card);
     });
+  }
+
+  async function equip(item) {
+    if (!item.meta?.color) return;
+    await setAvatarColor(item.meta.color);
+    render();
   }
 
   async function buy(item) {
@@ -85,6 +95,7 @@ export function mountStore(root, { onClose } = {}) {
         return;
       }
       root.querySelector("#store-balance").textContent = `🪙 ${data}`;
+      if (item.kind === "cosmetic" && item.meta?.color) await setAvatarColor(item.meta.color);
       render();
       return;
     }
