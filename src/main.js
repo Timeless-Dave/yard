@@ -11,10 +11,13 @@ import { mountLeaderboard } from "./minigames/leaderboard.js";
 import { mountVoting } from "./minigames/voting.js";
 import { mountStore } from "./minigames/store.js";
 import { isHalloween } from "./seasonal.js";
+import { mountParties } from "./minigames/parties.js";
+import { mountVending } from "./minigames/vending.js";
+import { PARTY_SPOTS } from "./partySpots.js";
 import { BUILDINGS, REAL_RECREATION, RETAIL_NEAR_UNION, FICTIONAL_RECREATION } from "./campusData.js";
 import { mountAuthModal } from "./authModal.js";
 import { onAuthChange } from "./auth.js";
-import { ONLINE } from "./supabase.js";
+import { supabase, ONLINE } from "./supabase.js";
 import { joinPresence, leavePresence, updateMyPosition, setMyIdentity, onPeersChange } from "./multiplayer.js";
 import { watchWallet, stopWatchingWallet, onBalanceChange } from "./economy.js";
 
@@ -57,6 +60,21 @@ sun.shadow.camera.right = 80;
 sun.shadow.camera.top = 80;
 sun.shadow.camera.bottom = -80;
 scene.add(sun);
+
+const DAY_SKY = 0x8fd0f0;
+const NIGHT_SKY = 0x0b1030;
+let nightMode = false;
+function setNightMode(on) {
+  nightMode = on;
+  scene.background = new THREE.Color(on ? NIGHT_SKY : DAY_SKY);
+  scene.fog.color = new THREE.Color(on ? NIGHT_SKY : DAY_SKY);
+  hemi.intensity = on ? 0.22 : 0.9;
+  sun.intensity = on ? 0.15 : 1.4;
+  nightToggleEl.textContent = on ? "☀️ Day Mode" : "🌙 Night Mode";
+  nightToggleEl.classList.toggle("chip-active", on);
+}
+const nightToggleEl = document.getElementById("night-toggle");
+nightToggleEl.addEventListener("click", () => setNightMode(!nightMode));
 
 function canvasTexture(draw, w = 256, h = 256) {
   const c = document.createElement("canvas");
@@ -415,6 +433,38 @@ throne.position.set(0, 0.3, 0);
 throne.castShadow = true;
 scene.add(throne);
 
+// ---- Vending machines ----
+function createVendingMachine(x, z) {
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(1.4, 2.4, 1),
+    new THREE.MeshStandardMaterial({ color: 0xd9272e })
+  );
+  body.position.set(x, 1.2, z);
+  body.castShadow = true;
+  const screen = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1.4),
+    new THREE.MeshBasicMaterial({
+      map: canvasTexture((ctx, w, h) => {
+        ctx.fillStyle = "#111";
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = "#f4b223";
+        ctx.lineWidth = 6;
+        for (let i = 0; i < 3; i++) ctx.strokeRect(10, 10 + i * 80, w - 20, 70);
+        ctx.fillStyle = "#f4b223";
+        ctx.font = "bold 22px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("SNACKS", w / 2, h - 10);
+      }),
+    })
+  );
+  screen.position.set(x, 1.5, z + 0.51);
+  scene.add(body, screen);
+  interactionZones.push({ x, z, radius: 2.5, key: "vending", label: "Get a snack" });
+}
+createVendingMachine(-66, -20); // Student Union
+createVendingMachine(-96, 12); // Dorm block
+createVendingMachine(-121, -142); // HPER
+
 // ---- Seasonal: Halloween "Harvest Bash" decorations ----
 function createPumpkin(x, z) {
   const body = new THREE.Mesh(
@@ -595,6 +645,8 @@ const MINIGAMES = {
   leaderboard: mountLeaderboard,
   king: mountVoting,
   store: mountStore,
+  parties: mountParties,
+  vending: mountVending,
 };
 
 function closeModal() {
@@ -748,6 +800,65 @@ function updatePeerLabels() {
     entry.label.style.top = y + "px";
     entry.label.style.display = pos.z < 1 ? "block" : "none";
   });
+}
+
+// ---- Live party markers ----
+const partyMarkers = new Map(); // party id -> THREE.Group
+
+function createPartyMarker(spotKey) {
+  const spot = PARTY_SPOTS[spotKey] || PARTY_SPOTS.bell_tower_yard;
+  const group = new THREE.Group();
+  const floor = new THREE.Mesh(
+    new THREE.CylinderGeometry(4, 4, 0.1, 24),
+    new THREE.MeshStandardMaterial({ color: 0x8a2be2, emissive: 0x4a0e8a, emissiveIntensity: 0.6, transparent: true, opacity: 0.6 })
+  );
+  floor.position.y = 0.05;
+  const booth = new THREE.Mesh(
+    new THREE.BoxGeometry(1.6, 1.4, 1),
+    new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
+  );
+  booth.position.set(0, 0.7, -3.5);
+  const light = new THREE.PointLight(0xff3bd4, 3, 14);
+  light.position.set(0, 3, 0);
+  group.add(floor, booth, light);
+  group.position.set(spot.x, 0, spot.z);
+  scene.add(group);
+  return group;
+}
+
+async function syncLiveParties() {
+  if (!ONLINE) return;
+  const nowIso = new Date().toISOString();
+  const { data } = await supabase.from("party_tallies").select("*").lte("starts_at", nowIso).gte("ends_at", nowIso);
+  const live = data || [];
+  const liveIds = new Set(live.map((p) => p.id));
+
+  for (const [id, group] of partyMarkers) {
+    if (!liveIds.has(id)) {
+      scene.remove(group);
+      partyMarkers.delete(id);
+      for (let i = interactionZones.length - 1; i >= 0; i--) {
+        if (interactionZones[i].partyId === id) interactionZones.splice(i, 1);
+      }
+    }
+  }
+
+  live.forEach((p) => {
+    if (partyMarkers.has(p.id)) return;
+    const group = createPartyMarker(p.spot);
+    partyMarkers.set(p.id, group);
+    const spot = PARTY_SPOTS[p.spot] || PARTY_SPOTS.bell_tower_yard;
+    interactionZones.push({ x: spot.x, z: spot.z, radius: 5, key: "parties", label: `${p.title} — RSVP / join in`, partyId: p.id });
+  });
+}
+
+if (ONLINE) {
+  syncLiveParties();
+  setInterval(syncLiveParties, 20000);
+  supabase
+    .channel("party-markers")
+    .on("postgres_changes", { event: "*", schema: "public", table: "parties" }, syncLiveParties)
+    .subscribe();
 }
 
 // ---- Loop ----
