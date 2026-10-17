@@ -16,6 +16,7 @@ import { mountVending } from "./minigames/vending.js";
 import { PARTY_SPOTS } from "./partySpots.js";
 import { startWeatherLoop, onWeatherChange } from "./weather.js";
 import { BUILDINGS, REAL_RECREATION, RETAIL_NEAR_UNION, FICTIONAL_RECREATION } from "./campusData.js";
+import { createBellTower, createAcademicHall, createModernHall, createDormHall, createStadiumComplex } from "./buildings.js";
 import { mountAuthModal } from "./authModal.js";
 import { onAuthChange } from "./auth.js";
 import { supabase, ONLINE } from "./supabase.js";
@@ -275,17 +276,32 @@ function createBuilding({ x, z, w, h, d, color, label, rotY = 0 }) {
   return group;
 }
 
-// Real UAPB buildings, positioned from OpenStreetMap data (see campusData.js)
+// Real UAPB buildings, positioned from OpenStreetMap data (see campusData.js).
+// The popular/iconic ones get researched, detailed models (src/buildings.js);
+// everything else still gets a labeled, colored building.
 BUILDINGS.forEach((b) => {
-  createBuilding({
-    x: b.x,
-    z: b.z,
-    w: b.w,
-    h: b.h,
-    d: b.d,
-    color: parseInt(b.color.slice(1), 16),
-    label: b.name,
-  });
+  if (b.name === "W.E. O'Bryant Bell Tower") {
+    createBellTower(scene, b.x, b.z);
+    return;
+  }
+  if (b.name === "Golden Lion Stadium") {
+    createStadiumComplex(scene, b.x, b.z);
+    return;
+  }
+  if (b.name === "Administration Building") {
+    createModernHall(scene, { x: b.x, z: b.z, w: b.w, h: b.h, d: b.d, label: b.name, color: b.color, columns: true });
+    return;
+  }
+  if (b.kind === "student_life" || b.kind === "arts" || b.kind === "athletics" || b.kind === "admin" || b.name === "John B. Watson Library") {
+    createModernHall(scene, { x: b.x, z: b.z, w: b.w, h: b.h, d: b.d, label: b.name, color: b.color });
+    return;
+  }
+  if (b.kind === "dorm") {
+    createDormHall(scene, { x: b.x, z: b.z, w: b.w, h: b.h, d: b.d, label: b.name, color: b.color });
+    return;
+  }
+  // Remaining academic halls — Collegiate Gothic, à la Caldwell Hall.
+  createAcademicHall(scene, { x: b.x, z: b.z, w: b.w, h: b.h, d: b.d, label: b.name, brick: b.color });
 });
 
 // Retail/dining kiosks near the Student Union (OSM has no interior POI data
