@@ -8,6 +8,12 @@
 // - Golden Lion Stadium (Simmons Bank Field): Wikimedia Commons aerial —
 //   gold/black end zones with "UAPB" lettering, tiered gray grandstand
 //   with a press box, smaller opposite stands, corner light towers.
+// - L.A. Davis, Sr. Student Union: real 2024 grand-reopening photo
+//   (uapbnews.wordpress.com) — crisp white modernist box with a dramatic
+//   cantilevered upper volume overhanging the entrance, ribbon windows.
+// - John Brown Watson Memorial Library: real photo (uapb.edu) — red brick
+//   base with a flat white overhanging canopy roof and a glass entrance
+//   framed by four tall white columns, banner signage between them.
 import * as THREE from "three";
 
 function canvasTexture(draw, w = 256, h = 256) {
@@ -360,6 +366,147 @@ export function createModernHall(scene, { x, z, w, h, d, label, color = "#3a5c8a
   if (label) {
     const sign = labelPlane(label, Math.min(w * 0.8, 6), 1.3, "#121212", "#f4b223");
     sign.position.set(0, h / 2, d / 2 + 0.03);
+    group.add(sign);
+  }
+
+  group.position.set(x, 0, z);
+  scene.add(group);
+  return group;
+}
+
+// ---- L.A. Davis, Sr. Student Union (cantilevered modern box) ----
+export function createStudentUnion(scene, { x, z, w, h, d, label }) {
+  const group = new THREE.Group();
+  const white = "#eef0ee";
+
+  const baseH = h * 0.6;
+  const base = new THREE.Mesh(
+    new THREE.BoxGeometry(w * 0.82, baseH, d * 0.82),
+    new THREE.MeshStandardMaterial({ color: white })
+  );
+  base.position.y = baseH / 2;
+  base.castShadow = true;
+  base.receiveShadow = true;
+  group.add(base);
+
+  // glass entrance band at ground level
+  const glassTex = canvasTexture((ctx, cw, ch) => {
+    ctx.fillStyle = "#17344a";
+    ctx.fillRect(0, 0, cw, ch);
+    ctx.strokeStyle = "#cfd8e0";
+    ctx.lineWidth = 4;
+    for (let i = 0; i <= 8; i++) {
+      const gx = (cw / 8) * i;
+      ctx.beginPath();
+      ctx.moveTo(gx, 0);
+      ctx.lineTo(gx, ch);
+      ctx.stroke();
+    }
+  }, 256, 128);
+  const glass = new THREE.Mesh(
+    new THREE.PlaneGeometry(w * 0.6, baseH * 0.6),
+    new THREE.MeshStandardMaterial({ map: glassTex })
+  );
+  glass.position.set(0, baseH * 0.35, (d * 0.82) / 2 + 0.02);
+  group.add(glass);
+
+  // cantilevered upper volume, overhanging the entrance
+  const capH = h * 0.4;
+  const cap = new THREE.Mesh(
+    new THREE.BoxGeometry(w, capH, d),
+    new THREE.MeshStandardMaterial({ color: white })
+  );
+  cap.position.set(0, baseH + capH / 2, -d * 0.06);
+  cap.castShadow = true;
+  group.add(cap);
+
+  // dark underside reveal on the cantilever, like the real overhang
+  const underside = new THREE.Mesh(
+    new THREE.PlaneGeometry(w * 0.98, d * 0.3),
+    new THREE.MeshStandardMaterial({ color: "#1a1a1a" })
+  );
+  underside.rotation.x = Math.PI / 2;
+  underside.position.set(0, baseH + 0.02, d * 0.3);
+  group.add(underside);
+
+  // ribbon windows on the cap
+  const ribbon = new THREE.Mesh(
+    new THREE.PlaneGeometry(w * 0.9, capH * 0.45),
+    new THREE.MeshStandardMaterial({ map: glassTex })
+  );
+  ribbon.position.set(0, baseH + capH * 0.55, d / 2 + 0.02);
+  group.add(ribbon);
+
+  if (label) {
+    const sign = labelPlane(label, Math.min(w * 0.8, 6), 1.1, "#121212", "#f4b223");
+    sign.position.set(0, baseH * 0.8, d * 0.82 / 2 + 0.05);
+    group.add(sign);
+  }
+
+  group.position.set(x, 0, z);
+  scene.add(group);
+  return group;
+}
+
+// ---- John Brown Watson Memorial Library (brick + glass + columns) ----
+export function createLibrary(scene, { x, z, w, h, d, label }) {
+  const group = new THREE.Group();
+  const brick = "#7a3b2e";
+  const cream = "#e8e2d0";
+
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshStandardMaterial({ color: brick })
+  );
+  body.position.y = h / 2;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  group.add(body);
+
+  // flat overhanging canopy roof
+  const canopy = new THREE.Mesh(
+    new THREE.BoxGeometry(w * 1.15, 0.3, d * 1.15),
+    new THREE.MeshStandardMaterial({ color: cream })
+  );
+  canopy.position.y = h + 0.15;
+  group.add(canopy);
+
+  // glass entrance
+  const glassTex = canvasTexture((ctx, cw, ch) => {
+    ctx.fillStyle = "#17344a";
+    ctx.fillRect(0, 0, cw, ch);
+    ctx.strokeStyle = "#cfd8e0";
+    ctx.lineWidth = 3;
+    for (let i = 0; i <= 5; i++) {
+      const gx = (cw / 5) * i;
+      ctx.beginPath();
+      ctx.moveTo(gx, 0);
+      ctx.lineTo(gx, ch);
+      ctx.stroke();
+    }
+  }, 256, 160);
+  const glass = new THREE.Mesh(
+    new THREE.PlaneGeometry(w * 0.55, h * 0.6),
+    new THREE.MeshStandardMaterial({ map: glassTex })
+  );
+  glass.position.set(0, h * 0.4, d / 2 + 0.02);
+  group.add(glass);
+
+  // four white entrance columns
+  for (let i = 0; i < 4; i++) {
+    const cx = -w * 0.3 + (w * 0.6 * i) / 3;
+    const col = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.18, 0.18, h * 0.85, 10),
+      new THREE.MeshStandardMaterial({ color: cream })
+    );
+    col.position.set(cx, (h * 0.85) / 2, d / 2 + 0.6);
+    col.castShadow = true;
+    group.add(col);
+  }
+
+  if (label) {
+    const sign = labelPlane(label, Math.min(w * 0.8, 6), 1.1, "#121212", "#f4b223");
+    sign.position.set(0, h * 0.78, d / 2 + 0.03);
     group.add(sign);
   }
 

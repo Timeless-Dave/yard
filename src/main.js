@@ -16,7 +16,7 @@ import { mountVending } from "./minigames/vending.js";
 import { PARTY_SPOTS } from "./partySpots.js";
 import { startWeatherLoop, onWeatherChange } from "./weather.js";
 import { BUILDINGS, REAL_RECREATION, RETAIL_NEAR_UNION, FICTIONAL_RECREATION } from "./campusData.js";
-import { createBellTower, createAcademicHall, createModernHall, createDormHall, createStadiumComplex } from "./buildings.js";
+import { createBellTower, createAcademicHall, createModernHall, createDormHall, createStadiumComplex, createStudentUnion, createLibrary } from "./buildings.js";
 import { mountAuthModal } from "./authModal.js";
 import { onAuthChange } from "./auth.js";
 import { supabase, ONLINE } from "./supabase.js";
@@ -292,7 +292,15 @@ BUILDINGS.forEach((b) => {
     createModernHall(scene, { x: b.x, z: b.z, w: b.w, h: b.h, d: b.d, label: b.name, color: b.color, columns: true });
     return;
   }
-  if (b.kind === "student_life" || b.kind === "arts" || b.kind === "athletics" || b.kind === "admin" || b.name === "John B. Watson Library") {
+  if (b.kind === "student_life") {
+    createStudentUnion(scene, { x: b.x, z: b.z, w: b.w, h: b.h, d: b.d, label: b.name });
+    return;
+  }
+  if (b.name === "John Brown Watson Memorial Library") {
+    createLibrary(scene, { x: b.x, z: b.z, w: b.w, h: b.h, d: b.d, label: b.name });
+    return;
+  }
+  if (b.kind === "arts" || b.kind === "athletics" || b.kind === "admin") {
     createModernHall(scene, { x: b.x, z: b.z, w: b.w, h: b.h, d: b.d, label: b.name, color: b.color });
     return;
   }
