@@ -1,11 +1,11 @@
 // Minimal service worker — exists mainly so Chrome/Android treat this as an
-// installable PWA. Caches the app shell for offline/flaky-connection loads;
-// everything dynamic (Supabase, weather) still goes over the network.
-const CACHE = "the-yard-shell-v1";
-const SHELL = ["/", "/icon-192.png", "/icon-512.png", "/manifest.webmanifest"];
+// installable PWA. Network-first for everything: this app ships updates
+// often, and a cache-first strategy would silently serve stale JS forever
+// once a device has it cached, with no visible error. The cache only kicks
+// in as an offline/flaky-connection fallback, never instead of fresh code.
+const CACHE = "the-yard-shell-v2";
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
+self.addEventListener("install", () => {
   self.skipWaiting();
 });
 
@@ -22,16 +22,12 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return; // let Supabase/API calls pass straight through
 
   event.respondWith(
-    caches.match(event.request).then(
-      (cached) =>
-        cached ||
-        fetch(event.request)
-          .then((res) => {
-            const copy = res.clone();
-            caches.open(CACHE).then((cache) => cache.put(event.request, copy));
-            return res;
-          })
-          .catch(() => cached)
-    )
+    fetch(event.request)
+      .then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+        return res;
+      })
+      .catch(() => caches.match(event.request))
   );
 });

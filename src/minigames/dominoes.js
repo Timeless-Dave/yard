@@ -1,4 +1,6 @@
 import { earnCoins } from "../economy.js";
+import { playSuccess, playFail } from "../sound.js";
+import { unlockAchievement } from "../achievements.js";
 
 function freshSet() {
   const tiles = [];
@@ -172,6 +174,8 @@ export function mountDominoes(root, { onClose } = {}) {
       const won = who === "player";
       state.log = won ? "Domino! You cleared your hand." : "AI dropped last tile. Domino — you lose this one.";
       finish();
+      won ? playSuccess() : playFail();
+      if (won) unlockAchievement("domino_king");
       if (won) {
         earnCoins(20, "dominoes win").then((r) => {
           if (r.ok) logEl.textContent += ` +20 🪙 (${r.balance} total)`;
@@ -194,6 +198,8 @@ export function mountDominoes(root, { onClose } = {}) {
         ? `Blocked — you win on pips, ${pSum} to ${aSum}.`
         : `Blocked — AI wins on pips, ${aSum} to ${pSum}.`;
     finish();
+    if (pSum !== aSum) won ? playSuccess() : playFail();
+    if (won) unlockAchievement("domino_king");
     if (won) {
       earnCoins(12, "dominoes blocked win").then((r) => {
         if (r.ok) logEl.textContent += ` +12 🪙 (${r.balance} total)`;

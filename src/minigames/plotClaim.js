@@ -1,5 +1,6 @@
 import { supabase, ONLINE } from "../supabase.js";
 import { getState } from "../auth.js";
+import { unlockAchievement } from "../achievements.js";
 
 export function mountPlotClaim(root, { letters, onClose } = {}) {
   if (!letters) {
@@ -66,7 +67,10 @@ export function mountPlotClaim(root, { letters, onClose } = {}) {
             display_name: authState.profile?.display_name || "Golden Lion",
           });
           if (error) statusEl.textContent = "Couldn't claim: " + error.message;
-          else refreshPlot();
+          else {
+            unlockAchievement("plot_owner");
+            refreshPlot();
+          }
         };
       } else {
         actionBtn.style.display = "none";

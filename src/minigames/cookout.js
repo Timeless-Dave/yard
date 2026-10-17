@@ -1,4 +1,6 @@
 import { earnCoins } from "../economy.js";
+import { playSuccess, playFail } from "../sound.js";
+import { unlockAchievement } from "../achievements.js";
 
 const GRADE_COINS = { S: 100, A: 70, B: 40, C: 15 };
 const FOODS = ["🍔 Burgers", "🌭 Hot Dogs", "🍗 Chicken", "🌽 Corn", "🍖 Ribs"];
@@ -94,6 +96,8 @@ export function mountCookout(root, { onClose } = {}) {
     logEl.innerHTML = `Pitmaster grade: <b>${grade}</b> — ${state.score} pts. ${
       grade === "S" ? "You're running the grill next homecoming." : "A little more practice at the grill."
     }`;
+    grade === "C" ? playFail() : playSuccess();
+    if (grade === "S") unlockAchievement("grill_master");
     const again = document.createElement("button");
     again.className = "btn btn-primary";
     again.style.cssText = "margin-top:8px;width:100%;";

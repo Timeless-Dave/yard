@@ -1,4 +1,6 @@
 import { earnCoins } from "../economy.js";
+import { playSuccess, playFail } from "../sound.js";
+import { unlockAchievement } from "../achievements.js";
 
 const SUITS = ["♠", "♥", "♦", "♣"];
 const RANKS = ["7", "8", "9", "10", "J", "Q", "K", "A"];
@@ -144,6 +146,10 @@ export function mountCardGame(root, { onClose } = {}) {
         ? `You took the table, ${state.tricks.player}-${state.tricks.ai}!`
         : `AI ran the table, ${state.tricks.ai}-${state.tricks.player}. Run it back.`;
       render();
+      if (win) {
+        playSuccess();
+        unlockAchievement("card_shark");
+      } else if (!tie) playFail();
       if (win) {
         earnCoins(15, "spades win").then((r) => {
           if (r.ok) logEl.textContent += ` +15 🪙 (${r.balance} total)`;

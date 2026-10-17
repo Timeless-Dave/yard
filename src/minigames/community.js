@@ -1,5 +1,6 @@
 import { supabase, ONLINE } from "../supabase.js";
 import { getState } from "../auth.js";
+import { unlockAchievement } from "../achievements.js";
 
 const STORAGE_KEY = "yard-corkboard-v1";
 const TYPES = [
@@ -128,6 +129,7 @@ export function mountCommunity(root, { onClose } = {}) {
       saveLocal(posts);
       render();
     }
+    unlockAchievement("corkboard_poster");
     msgInput.value = "";
   });
 

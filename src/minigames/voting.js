@@ -1,5 +1,6 @@
 import { supabase, ONLINE } from "../supabase.js";
 import { getState } from "../auth.js";
+import { unlockAchievement } from "../achievements.js";
 
 export function mountVoting(root, { onClose } = {}) {
   if (!ONLINE) {
@@ -79,7 +80,10 @@ export function mountVoting(root, { onClose } = {}) {
           .from("votes")
           .upsert({ user_id: authState.user.id, category, candidate_id: c.id }, { onConflict: "user_id,category" });
         if (voteError) alert("Couldn't vote: " + voteError.message);
-        else render();
+        else {
+          unlockAchievement("voter");
+          render();
+        }
       });
       listEl.appendChild(row);
     });

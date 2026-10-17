@@ -1,4 +1,6 @@
 import { earnCoins } from "../economy.js";
+import { playSuccess, playFail } from "../sound.js";
+import { unlockAchievement } from "../achievements.js";
 
 const GRADE_COINS = { S: 100, A: 70, B: 40, C: 15 };
 const ARROWS = [
@@ -108,6 +110,8 @@ export function mountStepShow(root, { onClose } = {}) {
     logEl.innerHTML = `Rehearsal grade: <b>${grade}</b> — ${state.score} pts. ${
       grade === "S" ? "You're lead line for Homecoming." : "Keep drilling for the step show."
     }`;
+    grade === "C" ? playFail() : playSuccess();
+    if (grade === "S") unlockAchievement("step_perfect");
     const again = document.createElement("button");
     again.className = "btn btn-primary";
     again.style.cssText = "margin-top:8px;width:100%;";

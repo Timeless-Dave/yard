@@ -34,6 +34,9 @@ and Divine Nine plot claims, connect a free Supabase project:
    - `008_parties.sql` — kickbacks/block parties/after parties: host one,
      RSVP, live tallies. Currently-live parties spawn a glowing dance floor
      marker at their named spot (`src/partySpots.js`) for everyone to see.
+   - `009_achievements.sql` — records which of the 13 Homecoming Checklist
+     achievements (`src/achievements.js`) each player has earned. Works
+     offline too (saved to localStorage), and syncs here once connected.
 
 ## Weather and day/night
 
