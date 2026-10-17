@@ -28,6 +28,9 @@ and Divine Nine plot claims, connect a free Supabase project:
      atomically server-side via `purchase_with_coins`.
    - `006_store_admin.sql` — a service-role-only function the Stripe
      webhook uses to grant coin packs after a real payment confirms.
+   - `007_seasonal_sales.sql` — adds discount/sale support to store items
+     and a Halloween drop. Seasons are date-gated client-side
+     (`src/seasonal.js`) — nothing to toggle manually each year.
 
 ## Turning on real-money purchases (Stripe)
 
