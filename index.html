@@ -189,6 +189,16 @@
       .lb-rank { font-weight: 800; text-align: center; }
       .lb-coins { color: var(--gold); font-weight: 700; }
 
+      .store-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; max-height: 320px; overflow-y: auto; }
+      .store-card {
+        background: #2a2a2a; border-radius: 10px; padding: 10px; text-align: center;
+        border: 1px solid rgba(255,255,255,0.1);
+      }
+      .store-icon { font-size: 28px; }
+      .store-name { font-size: 12px; font-weight: 700; margin: 4px 0 2px; min-height: 28px; }
+      .store-price { font-size: 12px; color: var(--gold); margin-bottom: 6px; }
+      .store-card button { width: 100%; padding: 6px; font-size: 12px; }
+
       .peer-tag {
         position: absolute; background: rgba(18,18,18,0.8); color: #fff; font-size: 11px;
         font-weight: 700; padding: 2px 8px; border-radius: 999px; transform: translate(-50%, -100%);
@@ -211,6 +221,7 @@
           <div class="chip" data-modal="cookout">🔥 Cookout</div>
           <div class="chip" data-modal="community">📌 Corkboard</div>
           <div class="chip" data-modal="leaderboard">🏅 Leaderboard</div>
+          <div class="chip" data-modal="store">🛍️ Store</div>
         </div>
         <div class="auth-row">
           <div class="chip hidden" id="wallet-badge">🪙 0</div>

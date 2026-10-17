@@ -23,6 +23,49 @@ and Divine Nine plot claims, connect a free Supabase project:
      Probate Night sign-ups. This only models the public, celebratory side
      of NPHC life — there is no pledge-process or ritual content anywhere
      in this app, by design.
+   - `005_store.sql` — cosmetics and coin packs, with a starter catalog you
+     can edit in the Supabase table editor. Coin-priced items purchase
+     atomically server-side via `purchase_with_coins`.
+   - `006_store_admin.sql` — a service-role-only function the Stripe
+     webhook uses to grant coin packs after a real payment confirms.
+
+## Turning on real-money purchases (Stripe)
+
+Coin-priced cosmetics work the moment the migrations above are run — no
+Stripe needed. Cash-priced coin packs need two more things, because a
+Stripe secret key must never be shipped to the browser:
+
+1. Install the Supabase CLI and log in (`supabase login`), then link this
+   project: `supabase link --project-ref YOUR-PROJECT-REF`.
+2. Create a [Stripe](https://stripe.com) account (test mode is fine to
+   start), then set secrets and deploy the two Edge Functions in
+   `supabase/functions/`:
+
+   ```
+   supabase secrets set STRIPE_SECRET_KEY=sk_test_...
+   supabase secrets set SITE_URL=https://your-deployed-site
+   supabase functions deploy create-checkout-session
+
+   supabase secrets set SUPABASE_SERVICE_ROLE_KEY=...   # Project Settings > API
+   supabase functions deploy stripe-webhook --no-verify-jwt
+   ```
+
+3. In the Stripe dashboard, add a webhook endpoint pointing at the deployed
+   `stripe-webhook` function's URL, listening for `checkout.session.completed`,
+   then copy its signing secret:
+
+   ```
+   supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_...
+   ```
+
+Until this is done, the store's cash items show "Payments aren't set up
+yet" instead of failing silently — coin-priced items are unaffected.
+
+**What this app never does:** no card number is ever typed into or handled
+by this app's own code — Stripe Checkout is a Stripe-hosted page. No secret
+key is ever in client code. Coin grants from a real payment only happen
+inside the webhook, authenticated by Stripe's signature, using the
+service-role key that only that server-side function holds.
 5. In the `uapb-yard/` folder, create a file named `.env.local`:
 
    ```

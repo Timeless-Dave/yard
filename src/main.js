@@ -9,6 +9,7 @@ import { mountCommunity } from "./minigames/community.js";
 import { mountPlotClaim } from "./minigames/plotClaim.js";
 import { mountLeaderboard } from "./minigames/leaderboard.js";
 import { mountVoting } from "./minigames/voting.js";
+import { mountStore } from "./minigames/store.js";
 import { BUILDINGS, REAL_RECREATION, RETAIL_NEAR_UNION, FICTIONAL_RECREATION } from "./campusData.js";
 import { mountAuthModal } from "./authModal.js";
 import { onAuthChange } from "./auth.js";
@@ -566,6 +567,7 @@ const MINIGAMES = {
   community: mountCommunity,
   leaderboard: mountLeaderboard,
   king: mountVoting,
+  store: mountStore,
 };
 
 function closeModal() {
