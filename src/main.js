@@ -8,6 +8,7 @@ import { mountCookout } from "./minigames/cookout.js";
 import { mountCommunity } from "./minigames/community.js";
 import { mountPlotClaim } from "./minigames/plotClaim.js";
 import { mountLeaderboard } from "./minigames/leaderboard.js";
+import { mountVoting } from "./minigames/voting.js";
 import { BUILDINGS, REAL_RECREATION, RETAIL_NEAR_UNION, FICTIONAL_RECREATION } from "./campusData.js";
 import { mountAuthModal } from "./authModal.js";
 import { onAuthChange } from "./auth.js";
@@ -541,10 +542,6 @@ window.addEventListener("keydown", (e) => {
 
 // ---- Modals ----
 const modalContent = {
-  king: {
-    title: "🏆 Vote: Mr. / Miss UAPB Homecoming",
-    body: "Cast your vote for this year's Homecoming King & Queen. Votes are powered by real Golden Lion alumni chapters — top candidates get crowned live during Homecoming week on the actual UAPB campus feed.",
-  },
   billboards: {
     title: "📢 Billboard Ad Space",
     body: "Real Pine Bluff businesses, Greek chapters, and alumni associations can buy a billboard on the Yard. Your brand, seen by every Golden Lion walking campus.",
@@ -568,6 +565,7 @@ const MINIGAMES = {
   cookout: mountCookout,
   community: mountCommunity,
   leaderboard: mountLeaderboard,
+  king: mountVoting,
 };
 
 function closeModal() {
