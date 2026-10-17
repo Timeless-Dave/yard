@@ -31,6 +31,9 @@ and Divine Nine plot claims, connect a free Supabase project:
    - `007_seasonal_sales.sql` — adds discount/sale support to store items
      and a Halloween drop. Seasons are date-gated client-side
      (`src/seasonal.js`) — nothing to toggle manually each year.
+   - `008_parties.sql` — kickbacks/block parties/after parties: host one,
+     RSVP, live tallies. Currently-live parties spawn a glowing dance floor
+     marker at their named spot (`src/partySpots.js`) for everyone to see.
 
 ## Turning on real-money purchases (Stripe)
 
