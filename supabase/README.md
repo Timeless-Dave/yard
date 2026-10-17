@@ -35,6 +35,15 @@ and Divine Nine plot claims, connect a free Supabase project:
      RSVP, live tallies. Currently-live parties spawn a glowing dance floor
      marker at their named spot (`src/partySpots.js`) for everyone to see.
 
+## Weather and day/night
+
+No setup needed — `src/weather.js` pulls live conditions for Pine Bluff, AR
+from [Open-Meteo](https://open-meteo.com) (free, keyless), refreshed every
+15 minutes. Day/night and sky dimming follow the real local time and
+weather (rain/snow spawn particles, fog tightens the view distance, storms
+dim things further). The Night Mode chip is a manual override; it's
+overwritten by the next real-weather refresh unless you leave it alone.
+
 ## Turning on real-money purchases (Stripe)
 
 Coin-priced cosmetics work the moment the migrations above are run — no

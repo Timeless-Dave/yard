@@ -14,6 +14,7 @@ import { isHalloween } from "./seasonal.js";
 import { mountParties } from "./minigames/parties.js";
 import { mountVending } from "./minigames/vending.js";
 import { PARTY_SPOTS } from "./partySpots.js";
+import { startWeatherLoop, onWeatherChange } from "./weather.js";
 import { BUILDINGS, REAL_RECREATION, RETAIL_NEAR_UNION, FICTIONAL_RECREATION } from "./campusData.js";
 import { mountAuthModal } from "./authModal.js";
 import { onAuthChange } from "./auth.js";
@@ -63,18 +64,91 @@ scene.add(sun);
 
 const DAY_SKY = 0x8fd0f0;
 const NIGHT_SKY = 0x0b1030;
+const SKY_DIM = { clear: 1, cloudy: 0.8, fog: 0.75, rain: 0.6, storm: 0.45, snow: 0.85 };
 let nightMode = false;
-function setNightMode(on) {
+let autoNightFromWeather = true;
+
+function setNightMode(on, { manual = false } = {}) {
   nightMode = on;
-  scene.background = new THREE.Color(on ? NIGHT_SKY : DAY_SKY);
-  scene.fog.color = new THREE.Color(on ? NIGHT_SKY : DAY_SKY);
-  hemi.intensity = on ? 0.22 : 0.9;
-  sun.intensity = on ? 0.15 : 1.4;
+  if (manual) autoNightFromWeather = false;
+  const dim = SKY_DIM[currentWeatherCategory] ?? 1;
+  const skyBase = new THREE.Color(on ? NIGHT_SKY : DAY_SKY);
+  skyBase.multiplyScalar(on ? 1 : dim);
+  scene.background = skyBase;
+  scene.fog.color = skyBase;
+  hemi.intensity = (on ? 0.22 : 0.9) * dim;
+  sun.intensity = (on ? 0.15 : 1.4) * dim;
   nightToggleEl.textContent = on ? "☀️ Day Mode" : "🌙 Night Mode";
   nightToggleEl.classList.toggle("chip-active", on);
 }
 const nightToggleEl = document.getElementById("night-toggle");
-nightToggleEl.addEventListener("click", () => setNightMode(!nightMode));
+nightToggleEl.addEventListener("click", () => setNightMode(!nightMode, { manual: true }));
+
+// ---- Weather (real data, see src/weather.js) ----
+let currentWeatherCategory = "clear";
+const weatherBadgeEl = document.getElementById("weather-badge");
+
+function makeWeatherParticles(count, color, size) {
+  const geo = new THREE.BufferGeometry();
+  const positions = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    positions[i * 3] = (Math.random() - 0.5) * 140;
+    positions[i * 3 + 1] = Math.random() * 60;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 140;
+  }
+  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  const mat = new THREE.PointsMaterial({ color, size, transparent: true, opacity: 0.6 });
+  const points = new THREE.Points(geo, mat);
+  points.visible = false;
+  points.frustumCulled = false;
+  scene.add(points);
+  return points;
+}
+const rainParticles = makeWeatherParticles(600, 0xaad4ff, 0.25);
+const snowParticles = makeWeatherParticles(400, 0xffffff, 0.35);
+
+function updateWeatherParticles(dt) {
+  if (rainParticles.visible) {
+    const pos = rainParticles.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      let y = pos.getY(i) - dt * 40;
+      if (y < 0) y = 60;
+      pos.setY(i, y);
+    }
+    pos.needsUpdate = true;
+    rainParticles.position.set(avatar.position.x, 0, avatar.position.z);
+  }
+  if (snowParticles.visible) {
+    const pos = snowParticles.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      let y = pos.getY(i) - dt * 4;
+      if (y < 0) y = 60;
+      pos.setY(i, y);
+    }
+    pos.needsUpdate = true;
+    snowParticles.position.set(avatar.position.x, 0, avatar.position.z);
+  }
+}
+
+function applyWeather(w) {
+  currentWeatherCategory = w.category;
+  if (autoNightFromWeather) setNightMode(!w.isDay);
+  else setNightMode(nightMode); // re-apply dimming for the new weather at the same day/night state
+
+  scene.fog.near = w.category === "fog" ? 20 : 70;
+  scene.fog.far = w.category === "fog" ? 90 : w.category === "storm" || w.category === "rain" ? 170 : 240;
+
+  rainParticles.visible = w.category === "rain" || w.category === "storm";
+  snowParticles.visible = w.category === "snow";
+
+  if (weatherBadgeEl) {
+    const tempLabel = w.tempF != null ? `${w.tempF}°F` : "";
+    weatherBadgeEl.textContent = `${w.icon} ${tempLabel}`.trim();
+    weatherBadgeEl.title = w.label + " · Pine Bluff, AR";
+  }
+}
+onWeatherChange(applyWeather);
+startWeatherLoop();
 
 function canvasTexture(draw, w = 256, h = 256) {
   const c = document.createElement("canvas");
@@ -541,10 +615,30 @@ scene.add(avatar);
 camera.position.copy(avatar.position).add(CAM_OFFSET);
 camera.lookAt(avatar.position);
 
-// ---- Input (keyboard + gamepad) ----
+// ---- Input (keyboard + gamepad + touch) ----
 const keys = {};
 window.addEventListener("keydown", (e) => (keys[e.key.toLowerCase()] = true));
 window.addEventListener("keyup", (e) => (keys[e.key.toLowerCase()] = false));
+
+document.querySelectorAll(".touch-btn[data-key]").forEach((btn) => {
+  const k = btn.dataset.key;
+  const press = (e) => {
+    e.preventDefault();
+    keys[k] = true;
+  };
+  const release = (e) => {
+    e.preventDefault();
+    keys[k] = false;
+  };
+  btn.addEventListener("pointerdown", press);
+  btn.addEventListener("pointerup", release);
+  btn.addEventListener("pointerleave", release);
+  btn.addEventListener("pointercancel", release);
+});
+document.getElementById("touch-interact")?.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  tryInteract();
+});
 
 let gamepadIndex = null;
 window.addEventListener("gamepadconnected", (e) => {
@@ -598,13 +692,11 @@ function pollGamepad() {
 }
 
 const promptEl = document.createElement("div");
-promptEl.style.cssText =
-  "position:absolute;bottom:90px;left:50%;transform:translateX(-50%);background:rgba(244,178,35,0.95);color:#121212;padding:8px 16px;border-radius:999px;font-weight:700;font-size:13px;display:none;z-index:5;";
+promptEl.className = "interact-prompt";
 app.appendChild(promptEl);
 
 const gamepadHintEl = document.createElement("div");
-gamepadHintEl.style.cssText =
-  "position:absolute;top:70px;left:50%;transform:translateX(-50%);background:rgba(61,220,132,0.95);color:#121212;padding:6px 14px;border-radius:999px;font-weight:700;font-size:12px;display:none;z-index:6;";
+gamepadHintEl.className = "gamepad-hint";
 app.appendChild(gamepadHintEl);
 
 let activeZone = null;
@@ -920,6 +1012,7 @@ function animate() {
   updateAvatar(dt);
   updateInteractionPrompt();
   updatePeerLabels();
+  updateWeatherParticles(dt);
   renderer.render(scene, camera);
 }
 animate();
