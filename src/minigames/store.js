@@ -2,6 +2,7 @@ import { supabase, ONLINE } from "../supabase.js";
 import { getState, setAvatarColor } from "../auth.js";
 import { getBalance } from "../economy.js";
 import { getActiveSeason } from "../seasonal.js";
+import { unlockAchievement } from "../achievements.js";
 
 export function mountStore(root, { onClose } = {}) {
   if (!ONLINE) {
@@ -80,6 +81,7 @@ export function mountStore(root, { onClose } = {}) {
   async function equip(item) {
     if (!item.meta?.color) return;
     await setAvatarColor(item.meta.color);
+    unlockAchievement("fresh_fit");
     render();
   }
 
@@ -96,6 +98,7 @@ export function mountStore(root, { onClose } = {}) {
       }
       root.querySelector("#store-balance").textContent = `🪙 ${data}`;
       if (item.kind === "cosmetic" && item.meta?.color) await setAvatarColor(item.meta.color);
+      unlockAchievement("shopper");
       render();
       return;
     }

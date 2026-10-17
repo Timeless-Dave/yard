@@ -1,6 +1,7 @@
 import { supabase, ONLINE } from "../supabase.js";
 import { getState } from "../auth.js";
 import { PARTY_SPOTS } from "../partySpots.js";
+import { unlockAchievement } from "../achievements.js";
 
 const VIBES = [
   { v: "kickback", label: "🎵 Kickback" },
@@ -100,7 +101,10 @@ export function mountParties(root, { onClose } = {}) {
             { onConflict: "party_id,user_id" }
           );
         if (rsvpError) alert("Couldn't RSVP: " + rsvpError.message);
-        else render();
+        else {
+          unlockAchievement("party_people");
+          render();
+        }
       });
       listEl.appendChild(row);
     });

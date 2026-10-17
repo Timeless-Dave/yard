@@ -1,4 +1,6 @@
 import { earnCoins } from "../economy.js";
+import { playSuccess, playFail } from "../sound.js";
+import { unlockAchievement } from "../achievements.js";
 
 const GRADE_COINS = { S: 100, A: 70, B: 40, C: 15 };
 const CODES = [
@@ -110,6 +112,8 @@ export function mountPager(root, { onClose } = {}) {
     logEl.innerHTML = `Pager grade: <b>${grade}</b> — ${state.score} pts. ${
       grade === "S" ? "Everybody's hitting you up." : "Keep practicing your codes."
     }`;
+    grade === "C" ? playFail() : playSuccess();
+    if (grade === "S") unlockAchievement("page_me");
     keypadEl.querySelectorAll("button").forEach((b) => (b.disabled = true));
     const again = document.createElement("button");
     again.className = "btn btn-primary";

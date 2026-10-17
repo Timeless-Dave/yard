@@ -18,6 +18,9 @@ import { startWeatherLoop, onWeatherChange } from "./weather.js";
 import { BUILDINGS, REAL_RECREATION, RETAIL_NEAR_UNION, FICTIONAL_RECREATION } from "./campusData.js";
 import { createBellTower, createAcademicHall, createModernHall, createDormHall, createStadiumComplex, createStudentUnion, createLibrary } from "./buildings.js";
 import { initMinimap } from "./minimap.js";
+import { playOpen, playClose, playClick, isMuted, toggleMuted } from "./sound.js";
+import { mountAchievements } from "./minigames/achievements.js";
+import { unlockAchievement } from "./achievements.js";
 import { mountAuthModal } from "./authModal.js";
 import { onAuthChange } from "./auth.js";
 import { supabase, ONLINE } from "./supabase.js";
@@ -84,7 +87,23 @@ function setNightMode(on, { manual = false } = {}) {
   nightToggleEl.classList.toggle("chip-active", on);
 }
 const nightToggleEl = document.getElementById("night-toggle");
-nightToggleEl.addEventListener("click", () => setNightMode(!nightMode, { manual: true }));
+nightToggleEl.addEventListener("click", () => {
+  setNightMode(!nightMode, { manual: true });
+  unlockAchievement("night_owl");
+});
+
+const soundToggleEl = document.getElementById("sound-toggle");
+function refreshSoundChip() {
+  const muted = isMuted();
+  soundToggleEl.textContent = muted ? "🔇 Sound" : "🔊 Sound";
+  soundToggleEl.classList.toggle("chip-active", !muted);
+}
+soundToggleEl.addEventListener("click", () => {
+  toggleMuted();
+  refreshSoundChip();
+  playClick();
+});
+refreshSoundChip();
 
 // ---- Weather (real data, see src/weather.js) ----
 let currentWeatherCategory = "clear";
@@ -766,13 +785,16 @@ const MINIGAMES = {
   store: mountStore,
   parties: mountParties,
   vending: mountVending,
+  achievements: mountAchievements,
 };
 
 function closeModal() {
   modalRoot.innerHTML = "";
+  playClose();
 }
 
 function openModal(key, zoneNote) {
+  playOpen();
   if (key === "plots") {
     const backdrop = document.createElement("div");
     backdrop.className = "modal-backdrop";
@@ -1000,6 +1022,7 @@ function updateAvatar(dt) {
   dz += pad.dz;
 
   if (dx !== 0 || dz !== 0) {
+    unlockAchievement("first_steps");
     const len = Math.max(1, Math.hypot(dx, dz));
     dx /= len;
     dz /= len;

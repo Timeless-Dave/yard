@@ -1,5 +1,6 @@
 import { supabase, ONLINE } from "./supabase.js";
 import { getState } from "./auth.js";
+import { playCoin } from "./sound.js";
 
 let balance = 0;
 let channel = null;
@@ -67,6 +68,7 @@ export async function earnCoins(amount, reason) {
   if (error) return { ok: false, error: error.message };
   balance = data;
   emit();
+  playCoin();
   return { ok: true, balance: data };
 }
 
