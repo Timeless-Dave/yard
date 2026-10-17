@@ -1,3 +1,5 @@
+import { earnCoins } from "../economy.js";
+
 const SUITS = ["♠", "♥", "♦", "♣"];
 const RANKS = ["7", "8", "9", "10", "J", "Q", "K", "A"];
 const TRUMP = "♠";
@@ -139,9 +141,14 @@ export function mountCardGame(root, { onClose } = {}) {
       state.log = tie
         ? `Push — ${state.tricks.player} tricks each. Run it back.`
         : win
-        ? `You took the table, ${state.tricks.player}-${state.tricks.ai}! +15 Yard Cred.`
+        ? `You took the table, ${state.tricks.player}-${state.tricks.ai}!`
         : `AI ran the table, ${state.tricks.ai}-${state.tricks.player}. Run it back.`;
       render();
+      if (win) {
+        earnCoins(15, "spades win").then((r) => {
+          if (r.ok) logEl.textContent += ` +15 🪙 (${r.balance} total)`;
+        });
+      }
       handEl.innerHTML = "";
       const again = document.createElement("button");
       again.className = "btn btn-primary";

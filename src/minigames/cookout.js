@@ -1,3 +1,6 @@
+import { earnCoins } from "../economy.js";
+
+const GRADE_COINS = { S: 100, A: 70, B: 40, C: 15 };
 const FOODS = ["🍔 Burgers", "🌭 Hot Dogs", "🍗 Chicken", "🌽 Corn", "🍖 Ribs"];
 const DURATION_MS = 2400;
 const ZONES = { perfectLo: 64, perfectHi: 80, goodLo: 50, goodHi: 92 };
@@ -97,6 +100,11 @@ export function mountCookout(root, { onClose } = {}) {
     again.textContent = "Fire it back up";
     again.addEventListener("click", () => mountCookout(root, { onClose }));
     root.querySelector(".game-modal").insertBefore(again, root.querySelector(".close"));
+
+    const coins = GRADE_COINS[grade];
+    earnCoins(coins, "cookout grade " + grade).then((r) => {
+      if (r.ok) logEl.innerHTML += ` <br/>+${coins} 🪙 (${r.balance} total)`;
+    });
   }
 
   root.querySelector(".close").addEventListener("click", () => {

@@ -1,3 +1,5 @@
+import { earnCoins } from "../economy.js";
+
 function freshSet() {
   const tiles = [];
   for (let i = 0; i <= 6; i++) for (let j = i; j <= 6; j++) tiles.push({ a: i, b: j });
@@ -167,8 +169,14 @@ export function mountDominoes(root, { onClose } = {}) {
     const hand = who === "player" ? state.player : state.ai;
     if (hand.length === 0) {
       state.over = true;
-      state.log = who === "player" ? "Domino! You cleared your hand. +20 Yard Cred." : "AI dropped last tile. Domino — you lose this one.";
+      const won = who === "player";
+      state.log = won ? "Domino! You cleared your hand." : "AI dropped last tile. Domino — you lose this one.";
       finish();
+      if (won) {
+        earnCoins(20, "dominoes win").then((r) => {
+          if (r.ok) logEl.textContent += ` +20 🪙 (${r.balance} total)`;
+        });
+      }
       return true;
     }
     return false;
@@ -178,13 +186,19 @@ export function mountDominoes(root, { onClose } = {}) {
     state.over = true;
     const pSum = pipSum(state.player);
     const aSum = pipSum(state.ai);
+    const won = pSum < aSum;
     state.log =
       pSum === aSum
         ? `Blocked — tied at ${pSum} pips. Push.`
-        : pSum < aSum
+        : won
         ? `Blocked — you win on pips, ${pSum} to ${aSum}.`
         : `Blocked — AI wins on pips, ${aSum} to ${pSum}.`;
     finish();
+    if (won) {
+      earnCoins(12, "dominoes blocked win").then((r) => {
+        if (r.ok) logEl.textContent += ` +12 🪙 (${r.balance} total)`;
+      });
+    }
   }
 
   function finish() {
