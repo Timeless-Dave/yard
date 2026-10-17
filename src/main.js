@@ -7,6 +7,7 @@ import { mountPager } from "./minigames/pager.js";
 import { mountCookout } from "./minigames/cookout.js";
 import { mountCommunity } from "./minigames/community.js";
 import { mountPlotClaim } from "./minigames/plotClaim.js";
+import { mountLeaderboard } from "./minigames/leaderboard.js";
 import { BUILDINGS, REAL_RECREATION, RETAIL_NEAR_UNION, FICTIONAL_RECREATION } from "./campusData.js";
 import { mountAuthModal } from "./authModal.js";
 import { onAuthChange } from "./auth.js";
@@ -566,6 +567,7 @@ const MINIGAMES = {
   pager: mountPager,
   cookout: mountCookout,
   community: mountCommunity,
+  leaderboard: mountLeaderboard,
 };
 
 function closeModal() {
