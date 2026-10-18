@@ -29,6 +29,15 @@ Screen" (iOS) or the install prompt (Android/Chrome) to get an app icon with
 no browser chrome. A touch D-pad and interact button appear automatically on
 touch devices.
 
+## Sharing / link previews
+
+`index.html` has Open Graph and Twitter Card tags pointing at `/og-image.png`
+for a clean preview when the link is shared. They use relative paths, which
+work for most crawlers once deployed — but once you have a real domain,
+change `og:image` / `twitter:image` to the full absolute URL
+(`https://yourdomain.com/og-image.png`) for maximum compatibility, since a
+few platforms don't resolve relative image URLs correctly.
+
 ## Project layout
 
 - `src/main.js` — scene setup, campus generation, avatar/camera, input,

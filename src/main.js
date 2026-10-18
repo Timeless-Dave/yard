@@ -20,6 +20,7 @@ import { createBellTower, createAcademicHall, createModernHall, createDormHall, 
 import { initMinimap } from "./minimap.js";
 import { playOpen, playClose, playClick, isMuted, toggleMuted } from "./sound.js";
 import { mountAchievements } from "./minigames/achievements.js";
+import { mountOnboarding, hasSeenOnboarding } from "./minigames/onboarding.js";
 import { unlockAchievement } from "./achievements.js";
 import { mountAuthModal } from "./authModal.js";
 import { onAuthChange } from "./auth.js";
@@ -786,6 +787,7 @@ const MINIGAMES = {
   parties: mountParties,
   vending: mountVending,
   achievements: mountAchievements,
+  onboarding: mountOnboarding,
 };
 
 function closeModal() {
@@ -1068,6 +1070,10 @@ function animate() {
   renderer.render(scene, camera);
 }
 animate();
+
+if (!hasSeenOnboarding()) {
+  setTimeout(() => openModal("onboarding"), 500);
+}
 
 // ---- PWA install ----
 if ("serviceWorker" in navigator) {
