@@ -17,6 +17,7 @@ import { startWeatherLoop, onWeatherChange, setWeatherLocation } from "./weather
 import { getActiveCampus, setActiveCampusId, CAMPUSES } from "./campuses.js";
 import { createBellTower, createAcademicHall, createModernHall, createDormHall, createStadiumComplex, createStudentUnion, createLibrary, createGymComplex, createFineArtsCenter, createSTEMBuilding, createCaldwellHall } from "./buildings.js";
 import { createRoadNetwork, createTraffic } from "./traffic.js";
+import { createPedestrians } from "./pedestrians.js";
 import { initMinimap } from "./minimap.js";
 import { playOpen, playClose, playClick, isMuted, toggleMuted } from "./sound.js";
 import { mountAchievements } from "./minigames/achievements.js";
@@ -422,6 +423,9 @@ if (ROAD_ROUTE) {
   createRoadNetwork(scene, ROAD_ROUTE);
   traffic = createTraffic(scene, ROAD_ROUTE, 4);
 }
+
+// Ambient NPC students strolling the campus hubs — purely decorative.
+const pedestrians = createPedestrians(scene, PARTY_SPOTS, 2);
 
 // Retail/dining kiosks near the Student Union (OSM has no interior POI data
 // for these, so they're placed just outside the real union building)
@@ -1153,6 +1157,7 @@ function animate() {
   updatePeerLabels();
   updateWeatherParticles(dt);
   traffic?.update(dt);
+  pedestrians.update(dt);
   minimap.update({ x: avatar.position.x, z: avatar.position.z, rotY: avatar.rotation.y, peers });
   renderer.render(scene, camera);
 }
