@@ -8,12 +8,12 @@ export const BUILDINGS = [
   { name: "Golden Lion Stadium", kind: "athletics", special: "stadium", color: "#0a5c2b", x: -31.0, z: -428.9, w: 22.0, h: 11, d: 12.1 },
   { name: "L.A. Davis, Sr. Student Union", kind: "student_life", special: "union_cantilever", color: "#f4b223", x: -60.1, z: -21.7, w: 11.0, h: 7, d: 8.8 },
   { name: "John Brown Watson Memorial Library", kind: "academic", special: "library", color: "#3a5c8a", x: -55.2, z: 5.7, w: 9.9, h: 8, d: 7.7 },
-  { name: "Health, Physical Education & Recreation (HPER)", kind: "athletics", color: "#2d6b4a", x: -123.1, z: -146.6, w: 12.1, h: 7, d: 8.8 },
+  { name: "Kenneth L. Johnson HPER Complex", kind: "athletics", special: "hper", color: "#2d6b4a", x: -123.1, z: -146.6, w: 12.1, h: 7, d: 8.8 },
   { name: "Administration Building", kind: "academic", special: "columns", color: "#8a3b2b", x: 60.0, z: -66.6, w: 11.0, h: 9, d: 7.7 },
   { name: "Dawson-Hicks Hall", kind: "academic", color: "#5a4a8a", x: 13.5, z: 34.0, w: 8.8, h: 7, d: 6.6 },
-  { name: "Hathaway-Howard Fine Arts Center", kind: "arts", color: "#7a2d8a", x: 26.1, z: 57.7, w: 9.9, h: 7, d: 7.2 },
+  { name: "Hathaway-Howard Fine Arts Center", kind: "arts", special: "fine_arts", color: "#7a2d8a", x: 26.1, z: 57.7, w: 9.9, h: 7, d: 7.2 },
   { name: "Caldwell Hall", kind: "academic", color: "#3a5c8a", x: 32.3, z: 0.7, w: 7.7, h: 6, d: 6.1 },
-  { name: "STEM Building", kind: "academic", color: "#2d6b8a", x: -98.4, z: -73.1, w: 9.9, h: 8, d: 7.2 },
+  { name: "STEM Building", kind: "academic", special: "stem", color: "#2d6b8a", x: -98.4, z: -73.1, w: 9.9, h: 8, d: 7.2 },
   { name: "Walker Research Center", kind: "academic", color: "#3a5c8a", x: -23.1, z: -55.1, w: 7.2, h: 6, d: 5.5 },
   { name: "Fitness Center", kind: "athletics", color: "#2d6b4a", x: -1.5, z: -67.8, w: 7.7, h: 6, d: 6.1 },
   { name: "Residential Life", kind: "admin", color: "#555555", x: -29.5, z: 104.1, w: 6.1, h: 5, d: 5.0 },
@@ -61,6 +61,23 @@ export const PARTY_SPOTS = {
   dorm_block: { label: "Dorm Block (Harrold)", x: -92, z: 18 },
   stadium_lot: { label: "Stadium Lot", x: -24, z: -418 },
 };
+
+// Approximate campus loop road, threading the Bell Tower, Student Union,
+// HPER, and Administration — for ambient car traffic. Not surveyed, just a
+// plausible loop through the real building layout above.
+export const ROAD_ROUTE = [
+  { x: 10, z: -10 },
+  { x: -15, z: -16 },
+  { x: -60, z: -22 },
+  { x: -95, z: -85 },
+  { x: -123, z: -147 },
+  { x: -70, z: -115 },
+  { x: -20, z: -67 },
+  { x: 30, z: -45 },
+  { x: 60, z: -67 },
+  { x: 35, z: -25 },
+  { x: 10, z: -10 },
+];
 
 export const CAMPUS_META = {
   id: "uapb",
