@@ -15,7 +15,8 @@ import { mountParties } from "./minigames/parties.js";
 import { mountVending } from "./minigames/vending.js";
 import { startWeatherLoop, onWeatherChange, setWeatherLocation } from "./weather.js";
 import { getActiveCampus, setActiveCampusId, CAMPUSES } from "./campuses.js";
-import { createBellTower, createAcademicHall, createModernHall, createDormHall, createStadiumComplex, createStudentUnion, createLibrary } from "./buildings.js";
+import { createBellTower, createAcademicHall, createModernHall, createDormHall, createStadiumComplex, createStudentUnion, createLibrary, createGymComplex, createFineArtsCenter, createSTEMBuilding } from "./buildings.js";
+import { createRoadNetwork, createTraffic } from "./traffic.js";
 import { initMinimap } from "./minimap.js";
 import { playOpen, playClose, playClick, isMuted, toggleMuted } from "./sound.js";
 import { mountAchievements } from "./minigames/achievements.js";
@@ -30,7 +31,7 @@ import { watchWallet, stopWatchingWallet, onBalanceChange } from "./economy.js";
 // ---- Active campus (switchable via the 🏫 Campus chip; see src/campuses.js) ----
 const ACTIVE_CAMPUS = getActiveCampus();
 const CAMPUS_META = ACTIVE_CAMPUS.meta;
-const { BUILDINGS, REAL_RECREATION, RETAIL_NEAR_UNION, FICTIONAL_RECREATION, VENDING_SPOTS, PARTY_SPOTS } = ACTIVE_CAMPUS.data;
+const { BUILDINGS, REAL_RECREATION, RETAIL_NEAR_UNION, FICTIONAL_RECREATION, VENDING_SPOTS, PARTY_SPOTS, ROAD_ROUTE } = ACTIVE_CAMPUS.data;
 
 document.title = `The Yard — ${CAMPUS_META.label} Homecoming`;
 const brandTextEl = document.getElementById("brand-text");
@@ -384,6 +385,18 @@ BUILDINGS.forEach((b) => {
     createModernHall(scene, { x: b.x, z: b.z, w: b.w, h: b.h, d: b.d, label: b.name, color: b.color, columns: true });
     return;
   }
+  if (b.special === "hper") {
+    createGymComplex(scene, { x: b.x, z: b.z, w: b.w, h: b.h, d: b.d, label: b.name, color: b.color });
+    return;
+  }
+  if (b.special === "fine_arts") {
+    createFineArtsCenter(scene, { x: b.x, z: b.z, w: b.w, h: b.h, d: b.d, label: b.name, color: b.color });
+    return;
+  }
+  if (b.special === "stem") {
+    createSTEMBuilding(scene, { x: b.x, z: b.z, w: b.w, h: b.h, d: b.d, label: b.name, color: b.color });
+    return;
+  }
   if (b.kind === "student_life" || b.kind === "arts" || b.kind === "athletics" || b.kind === "admin") {
     createModernHall(scene, { x: b.x, z: b.z, w: b.w, h: b.h, d: b.d, label: b.name, color: b.color });
     return;
@@ -397,6 +410,14 @@ BUILDINGS.forEach((b) => {
 });
 
 const minimap = initMinimap(document.getElementById("minimap"), { xMin: X_MIN, xMax: X_MAX, zMin: Z_MIN, zMax: Z_MAX, buildings: BUILDINGS });
+
+// Ambient road loop + looping car traffic — only on campuses with a
+// ROAD_ROUTE defined (see src/campusData.*.js).
+let traffic = null;
+if (ROAD_ROUTE) {
+  createRoadNetwork(scene, ROAD_ROUTE);
+  traffic = createTraffic(scene, ROAD_ROUTE, 4);
+}
 
 // Retail/dining kiosks near the Student Union (OSM has no interior POI data
 // for these, so they're placed just outside the real union building)
@@ -1127,6 +1148,7 @@ function animate() {
   updateInteractionPrompt();
   updatePeerLabels();
   updateWeatherParticles(dt);
+  traffic?.update(dt);
   minimap.update({ x: avatar.position.x, z: avatar.position.z, rotY: avatar.rotation.y, peers });
   renderer.render(scene, camera);
 }

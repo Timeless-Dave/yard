@@ -572,6 +572,158 @@ export function createDormHall(scene, { x, z, w, h, d, label, color = "#6b4423" 
   return group;
 }
 
+// ---- Kenneth L. Johnson HPER Complex (gym, pool, courts) ----
+// Researched from UAPB facility descriptions: a rec/athletics complex with
+// an arena, pool, and racquetball courts — modeled as a glass-banded box
+// with a barrel-vaulted gym roof over the arena portion.
+export function createGymComplex(scene, { x, z, w, h, d, label, color = "#2d6b4a" }) {
+  const group = new THREE.Group();
+  const cream = "#e8e2d0";
+
+  const bandTex = glassBandTexture({ base: color });
+  const sideMat = new THREE.MeshStandardMaterial({ map: bandTex });
+  const topMat = new THREE.MeshStandardMaterial({ color: cream });
+  const bodyH = h * 0.62;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(w, bodyH, d), [sideMat, sideMat, topMat, topMat, sideMat, sideMat]);
+  body.position.y = bodyH / 2;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  group.add(body);
+
+  // barrel-vaulted arena roof
+  const vault = new THREE.Mesh(
+    new THREE.CylinderGeometry(w * 0.4, w * 0.4, d * 0.85, 20, 1, true, 0, Math.PI),
+    new THREE.MeshStandardMaterial({ color: 0x9aa0a6, side: THREE.DoubleSide })
+  );
+  vault.rotation.x = Math.PI / 2;
+  vault.rotation.z = Math.PI;
+  vault.position.set(0, bodyH, 0);
+  vault.castShadow = true;
+  group.add(vault);
+
+  const glassTex = canvasTexture((ctx, cw, ch) => {
+    ctx.fillStyle = "#17344a";
+    ctx.fillRect(0, 0, cw, ch);
+    ctx.strokeStyle = "#cfd8e0";
+    ctx.lineWidth = 3;
+    for (let i = 0; i <= 6; i++) {
+      const gx = (cw / 6) * i;
+      ctx.beginPath();
+      ctx.moveTo(gx, 0);
+      ctx.lineTo(gx, ch);
+      ctx.stroke();
+    }
+  }, 256, 160);
+  const glass = new THREE.Mesh(
+    new THREE.PlaneGeometry(w * 0.5, bodyH * 0.65),
+    new THREE.MeshStandardMaterial({ map: glassTex })
+  );
+  glass.position.set(0, bodyH * 0.4, d / 2 + 0.02);
+  group.add(glass);
+
+  if (label) {
+    const sign = labelPlane(label, Math.min(w * 0.8, 6), 1.1, "#121212", "#f4b223");
+    sign.position.set(0, bodyH * 0.82, d / 2 + 0.03);
+    group.add(sign);
+  }
+
+  group.position.set(x, 0, z);
+  scene.add(group);
+  return group;
+}
+
+// ---- Hathaway-Howard Fine Arts Center (with the Windgate Art Tower) ----
+// Researched: a $5M Windgate Foundation gift funds a new Art Tower addition —
+// described as the tallest building on campus once complete. Modeled as a
+// purple-accented main hall with a slender tower volume at one corner.
+export function createFineArtsCenter(scene, { x, z, w, h, d, label, color = "#7a2d8a" }) {
+  const group = new THREE.Group();
+  const cream = "#e8e2d0";
+
+  const bandTex = glassBandTexture({ base: color });
+  const sideMat = new THREE.MeshStandardMaterial({ map: bandTex });
+  const topMat = new THREE.MeshStandardMaterial({ color: cream });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), [sideMat, sideMat, topMat, topMat, sideMat, sideMat]);
+  body.position.y = h / 2;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  group.add(body);
+
+  const towerH = h * 2.1;
+  const tower = new THREE.Mesh(
+    new THREE.BoxGeometry(w * 0.26, towerH, d * 0.26),
+    new THREE.MeshStandardMaterial({ color: "#5a1f66" })
+  );
+  tower.position.set(w * 0.32, towerH / 2, -d * 0.32);
+  tower.castShadow = true;
+  group.add(tower);
+
+  const towerCap = new THREE.Mesh(
+    new THREE.BoxGeometry(w * 0.3, 0.25, d * 0.3),
+    new THREE.MeshStandardMaterial({ color: cream })
+  );
+  towerCap.position.set(w * 0.32, towerH + 0.12, -d * 0.32);
+  group.add(towerCap);
+
+  const towerSign = labelPlane("Windgate Art Tower", w * 0.5, 0.8, "#121212", "#f4b223");
+  towerSign.position.set(w * 0.32, towerH * 0.55, -d * 0.32 + d * 0.13 + 0.02);
+  group.add(towerSign);
+
+  if (label) {
+    const sign = labelPlane(label, Math.min(w * 0.8, 6), 1.1, "#121212", "#f4b223");
+    sign.position.set(0, h * 0.5, d / 2 + 0.03);
+    group.add(sign);
+  }
+
+  group.position.set(x, 0, z);
+  scene.add(group);
+  return group;
+}
+
+// ---- STEM Building & Conference Center (with its reflective pool) ----
+// Researched: a $10M, 29,000 sq ft facility with labs, a conference center,
+// and a reflective pool out front — modeled with a glass-banded box and a
+// shallow water plane facing the entrance.
+export function createSTEMBuilding(scene, { x, z, w, h, d, label, color = "#2d6b8a" }) {
+  const group = new THREE.Group();
+  const cream = "#e8e2d0";
+
+  const bandTex = glassBandTexture({ base: color });
+  const sideMat = new THREE.MeshStandardMaterial({ map: bandTex });
+  const topMat = new THREE.MeshStandardMaterial({ color: cream });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), [sideMat, sideMat, topMat, topMat, sideMat, sideMat]);
+  body.position.y = h / 2;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  group.add(body);
+
+  const pool = new THREE.Mesh(
+    new THREE.PlaneGeometry(w * 0.7, d * 0.45),
+    new THREE.MeshStandardMaterial({ color: "#2a5a7a", metalness: 0.35, roughness: 0.15 })
+  );
+  pool.rotation.x = -Math.PI / 2;
+  pool.position.set(0, 0.03, d / 2 + d * 0.3);
+  pool.receiveShadow = true;
+  group.add(pool);
+
+  const poolEdge = new THREE.Mesh(
+    new THREE.BoxGeometry(w * 0.72, 0.1, d * 0.47),
+    new THREE.MeshStandardMaterial({ color: cream })
+  );
+  poolEdge.position.set(0, -0.01, d / 2 + d * 0.3);
+  group.add(poolEdge);
+
+  if (label) {
+    const sign = labelPlane(label, Math.min(w * 0.8, 6), 1.1, "#121212", "#f4b223");
+    sign.position.set(0, h * 0.5, d / 2 + 0.03);
+    group.add(sign);
+  }
+
+  group.position.set(x, 0, z);
+  scene.add(group);
+  return group;
+}
+
 // ---- Golden Lion Stadium (Simmons Bank Field) ----
 export function createStadiumComplex(scene, x, z) {
   const group = new THREE.Group();
