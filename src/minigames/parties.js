@@ -1,4 +1,5 @@
-import { supabase, ONLINE } from "../supabase.js";
+import { collection, doc, addDoc, setDoc, query, where, orderBy, limit, onSnapshot, Timestamp, serverTimestamp } from "firebase/firestore";
+import { db, ONLINE } from "../firebase.js";
 import { getState } from "../auth.js";
 import { getActiveCampus } from "../campuses.js";
 const { PARTY_SPOTS } = getActiveCampus().data;
@@ -17,8 +18,8 @@ const START_OFFSETS = [
 ];
 const DURATION_HOURS = 3;
 
-function fmtTime(iso) {
-  return new Date(iso).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
+function fmtTime(ts) {
+  return ts.toDate().toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
 }
 
 export function mountParties(root, { onClose } = {}) {
@@ -26,7 +27,7 @@ export function mountParties(root, { onClose } = {}) {
     root.innerHTML = `
       <div class="modal">
         <h3>🎉 Kickbacks & Parties</h3>
-        <p>Host a kickback, block party, or after party at a named spot on campus — other players see it live on the map and can RSVP. Connect Supabase (see <code>supabase/README.md</code>) to turn this on.</p>
+        <p>Host a kickback, block party, or after party at a named spot on campus — other players see it live on the map and can RSVP. Connect Firebase (see <code>firebase/README.md</code>) to turn this on.</p>
         <button class="btn btn-primary close" style="width:100%;">Close</button>
       </div>`;
     root.querySelector(".close").addEventListener("click", () => onClose?.());
@@ -34,7 +35,7 @@ export function mountParties(root, { onClose } = {}) {
   }
 
   const authState = getState();
-  let channel = null;
+  let unsubscribe = null;
 
   root.innerHTML = `
     <div class="modal game-modal">
@@ -63,52 +64,57 @@ export function mountParties(root, { onClose } = {}) {
   Object.entries(PARTY_SPOTS).forEach(([key, s]) => spotSel.appendChild(new Option(s.label, key)));
   START_OFFSETS.forEach((o) => whenSel.appendChild(new Option(o.label, o.mins)));
 
-  async function render() {
-    const { data, error } = await supabase
-      .from("party_tallies")
-      .select("*")
-      .gte("ends_at", new Date().toISOString())
-      .order("starts_at", { ascending: true })
-      .limit(20);
-    if (error) {
-      listEl.textContent = "Couldn't load parties: " + error.message;
-      return;
-    }
-    if (!data?.length) {
+  function render(parties) {
+    if (!parties.length) {
       listEl.innerHTML = '<div style="opacity:0.5;font-size:13px;text-align:center;padding:10px;">Nothing on the books — host the first one.</div>';
       return;
     }
     listEl.innerHTML = "";
     const now = Date.now();
-    data.forEach((p) => {
-      const live = new Date(p.starts_at).getTime() <= now && new Date(p.ends_at).getTime() >= now;
+    parties.forEach((p) => {
+      const live = p.startsAt.toMillis() <= now && p.endsAt.toMillis() >= now;
       const vibe = VIBES.find((v) => v.v === p.vibe)?.label || p.vibe;
       const spotLabel = PARTY_SPOTS[p.spot]?.label || p.spot;
       const row = document.createElement("div");
       row.className = "lb-row";
       row.innerHTML = `
         <span class="lb-rank">${live ? "🔴" : "🕐"}</span>
-        <span class="lb-name">${vibe} — <b>${p.title}</b><br/><small style="opacity:0.7;">${spotLabel} · ${live ? "live now" : fmtTime(p.starts_at)} · ${p.rsvp_count} going</small></span>
+        <span class="lb-name">${vibe} — <b>${p.title}</b><br/><small style="opacity:0.7;">${spotLabel} · ${live ? "live now" : fmtTime(p.startsAt)} · ${p.rsvpCount || 0} going</small></span>
         <button class="btn btn-secondary" style="padding:6px 10px;font-size:12px;">RSVP</button>`;
       row.querySelector("button").addEventListener("click", async () => {
         if (!authState.user) {
           alert("Join the Yard first (Sign up / Log in) to RSVP.");
           return;
         }
-        const { error: rsvpError } = await supabase
-          .from("party_rsvps")
-          .upsert(
-            { party_id: p.id, user_id: authState.user.id, display_name: authState.profile?.display_name || "Golden Lion" },
-            { onConflict: "party_id,user_id" }
-          );
-        if (rsvpError) alert("Couldn't RSVP: " + rsvpError.message);
-        else {
+        try {
+          await setDoc(doc(db, "partyRsvps", `${p.id}_${authState.user.uid}`), {
+            partyId: p.id,
+            userId: authState.user.uid,
+            displayName: authState.profile?.display_name || "Golden Lion",
+            createdAt: serverTimestamp(),
+          });
           unlockAchievement("party_people");
-          render();
+        } catch (e) {
+          alert("Couldn't RSVP: " + e.message);
         }
       });
       listEl.appendChild(row);
     });
+  }
+
+  function watch() {
+    const q = query(
+      collection(db, "parties"),
+      where("endsAt", ">=", Timestamp.now()),
+      orderBy("endsAt"),
+      orderBy("startsAt"),
+      limit(20)
+    );
+    unsubscribe = onSnapshot(
+      q,
+      (snap) => render(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      (e) => (listEl.textContent = "Couldn't load parties: " + e.message)
+    );
   }
 
   root.querySelector("#pt-host").addEventListener("click", async () => {
@@ -120,32 +126,28 @@ export function mountParties(root, { onClose } = {}) {
     }
     const startsAt = new Date(Date.now() + Number(whenSel.value) * 60000);
     const endsAt = new Date(startsAt.getTime() + DURATION_HOURS * 3600000);
-    const { error } = await supabase.from("parties").insert({
-      host_id: authState.user.id,
-      host_name: authState.profile?.display_name || "Golden Lion",
-      title,
-      vibe: vibeSel.value,
-      spot: spotSel.value,
-      starts_at: startsAt.toISOString(),
-      ends_at: endsAt.toISOString(),
-    });
-    if (error) alert("Couldn't host: " + error.message);
-    else {
+    try {
+      await addDoc(collection(db, "parties"), {
+        hostId: authState.user.uid,
+        hostName: authState.profile?.display_name || "Golden Lion",
+        title,
+        vibe: vibeSel.value,
+        spot: spotSel.value,
+        startsAt: Timestamp.fromDate(startsAt),
+        endsAt: Timestamp.fromDate(endsAt),
+        rsvpCount: 0,
+        createdAt: serverTimestamp(),
+      });
       titleInput.value = "";
-      render();
+    } catch (e) {
+      alert("Couldn't host: " + e.message);
     }
   });
 
-  channel = supabase
-    .channel("parties-live")
-    .on("postgres_changes", { event: "*", schema: "public", table: "parties" }, () => render())
-    .on("postgres_changes", { event: "*", schema: "public", table: "party_rsvps" }, () => render())
-    .subscribe();
-
   root.querySelector(".close").addEventListener("click", () => {
-    if (channel) supabase.removeChannel(channel);
+    if (unsubscribe) unsubscribe();
     onClose?.();
   });
 
-  render();
+  watch();
 }

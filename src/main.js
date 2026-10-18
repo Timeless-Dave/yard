@@ -33,7 +33,8 @@ import { mountOnboarding, hasSeenOnboarding } from "./minigames/onboarding.js";
 import { unlockAchievement } from "./achievements.js";
 import { mountAuthModal } from "./authModal.js";
 import { onAuthChange } from "./auth.js";
-import { supabase, ONLINE } from "./supabase.js";
+import { db, ONLINE } from "./firebase.js";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { joinPresence, leavePresence, updateMyPosition, setMyIdentity, onPeersChange } from "./multiplayer.js";
 import { watchWallet, stopWatchingWallet, onBalanceChange } from "./economy.js";
 
@@ -1101,9 +1102,9 @@ onAuthChange(async (state) => {
   authUser = state.user;
   if (!ONLINE) return;
   if (state.user) {
-    await joinPresence(state.user.id, state.profile);
+    await joinPresence(state.user.uid, state.profile);
     setMyIdentity(state.profile?.display_name || "Golden Lion", state.profile?.color || "#f4b223");
-    watchWallet(state.user.id);
+    watchWallet(state.user.uid);
     if (state.profile?.color) torso.material.color.set(state.profile.color);
   } else {
     leavePresence();
@@ -1202,12 +1203,8 @@ function createPartyMarker(spotKey) {
   return group;
 }
 
-async function syncLiveParties() {
-  if (!ONLINE) return;
-  const nowIso = new Date().toISOString();
-  const { data } = await supabase.from("party_tallies").select("*").lte("starts_at", nowIso).gte("ends_at", nowIso);
-  const live = data || [];
-  const liveIds = new Set(live.map((p) => p.id));
+function syncLiveParties(parties) {
+  const liveIds = new Set(parties.map((p) => p.id));
 
   for (const [id, group] of partyMarkers) {
     if (!liveIds.has(id)) {
@@ -1219,7 +1216,7 @@ async function syncLiveParties() {
     }
   }
 
-  live.forEach((p) => {
+  parties.forEach((p) => {
     if (partyMarkers.has(p.id)) return;
     const group = createPartyMarker(p.spot);
     partyMarkers.set(p.id, group);
@@ -1229,12 +1226,18 @@ async function syncLiveParties() {
 }
 
 if (ONLINE) {
-  syncLiveParties();
-  setInterval(syncLiveParties, 20000);
-  supabase
-    .channel("party-markers")
-    .on("postgres_changes", { event: "*", schema: "public", table: "parties" }, syncLiveParties)
-    .subscribe();
+  // Only one inequality filter per Firestore query, so this fetches every
+  // not-yet-ended party (endsAt >= now) via onSnapshot, then filters down to
+  // "already started" client-side. A 20s re-check keeps catching parties
+  // that cross their start time between writes — onSnapshot alone only
+  // fires on document changes, not as time passes.
+  let notYetEnded = [];
+  const q = query(collection(db, "parties"), where("endsAt", ">=", new Date()));
+  onSnapshot(q, (snap) => {
+    notYetEnded = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    syncLiveParties(notYetEnded.filter((p) => p.startsAt.toMillis() <= Date.now()));
+  });
+  setInterval(() => syncLiveParties(notYetEnded.filter((p) => p.startsAt.toMillis() <= Date.now())), 20000);
 }
 
 // ---- Loop ----

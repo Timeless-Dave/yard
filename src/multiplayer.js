@@ -1,7 +1,9 @@
-import { supabase, ONLINE } from "./supabase.js";
+import { ref, onValue, onChildAdded, onChildChanged, onChildRemoved, set, update, remove, onDisconnect } from "firebase/database";
+import { rtdb, ONLINE } from "./firebase.js";
 
-let channel = null;
 let myKey = null;
+let myIdentity = { name: "Golden Lion", color: "#f4b223" };
+let unsubscribers = [];
 const peers = new Map(); // key -> { x, z, rotY, name, color }
 const listeners = new Set();
 
@@ -20,61 +22,64 @@ export function getPeers() {
 }
 
 export function isConnected() {
-  return !!channel;
+  return !!myKey;
+}
+
+function teardownListeners() {
+  unsubscribers.forEach((off) => off());
+  unsubscribers = [];
 }
 
 export async function joinPresence(userId, profile) {
   if (!ONLINE) return;
   leavePresence();
   myKey = userId;
-  channel = supabase.channel("yard-presence", { config: { presence: { key: userId } } });
-  channel._lastName = profile?.display_name || "Golden Lion";
-  channel._lastColor = profile?.color || "#f4b223";
+  myIdentity = { name: profile?.display_name || "Golden Lion", color: profile?.color || "#f4b223" };
 
-  channel.on("presence", { event: "sync" }, () => {
-    const state = channel.presenceState();
-    peers.clear();
-    for (const key of Object.keys(state)) {
-      if (key === myKey) continue;
-      const entry = state[key][0];
-      if (entry) peers.set(key, entry);
+  const myRef = ref(rtdb, `presence/${userId}`);
+  const connectedRef = ref(rtdb, ".info/connected");
+  const offConnected = onValue(connectedRef, (snap) => {
+    if (snap.val() === true) {
+      onDisconnect(myRef).remove();
+      set(myRef, { ...myIdentity, x: 0, z: 10, rotY: 0, updatedAt: Date.now() });
     }
+  });
+  unsubscribers.push(offConnected);
+
+  const peersRef = ref(rtdb, "presence");
+  const upsertPeer = (snap) => {
+    if (snap.key === myKey) return;
+    peers.set(snap.key, snap.val());
+    emit();
+  };
+  const offAdded = onChildAdded(peersRef, upsertPeer);
+  const offChanged = onChildChanged(peersRef, upsertPeer);
+  const offRemoved = onChildRemoved(peersRef, (snap) => {
+    peers.delete(snap.key);
     emit();
   });
-
-  await channel.subscribe(async (status) => {
-    if (status === "SUBSCRIBED") {
-      await channel.track({
-        name: profile?.display_name || "Golden Lion",
-        color: profile?.color || "#f4b223",
-        x: 0,
-        z: 10,
-        rotY: 0,
-      });
-    }
-  });
+  unsubscribers.push(offAdded, offChanged, offRemoved);
 }
 
 let lastSent = 0;
 export function updateMyPosition(x, z, rotY) {
-  if (!channel) return;
+  if (!ONLINE || !myKey) return;
   const now = performance.now();
   if (now - lastSent < 120) return; // throttle broadcasts
   lastSent = now;
-  channel.track({ x, z, rotY, name: channel._lastName, color: channel._lastColor });
+  update(ref(rtdb, `presence/${myKey}`), { x, z, rotY, updatedAt: Date.now() });
 }
 
 export function setMyIdentity(name, color) {
-  if (!channel) return;
-  channel._lastName = name;
-  channel._lastColor = color;
+  myIdentity = { name, color };
+  if (!myKey) return;
+  update(ref(rtdb, `presence/${myKey}`), { name, color });
 }
 
 export function leavePresence() {
-  if (channel) {
-    supabase.removeChannel(channel);
-    channel = null;
-  }
+  if (myKey) remove(ref(rtdb, `presence/${myKey}`));
+  teardownListeners();
+  myKey = null;
   peers.clear();
   emit();
 }

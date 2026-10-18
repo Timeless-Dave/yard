@@ -1,0 +1,113 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- profiles ----
+    match /users/{uid} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ---- corkboard ----
+    match /corkboardPosts/{postId} {
+      allow read: if true;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow update, delete: if false;
+    }
+
+    // ---- Divine Nine plot claims ----
+    match /plotClaims/{letters} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.userId
+        && !exists(/databases/$(database)/documents/plotClaims/$(letters));
+      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow update: if false;
+    }
+
+    // ---- coin economy: client-unwritable, Cloud Functions (Admin SDK) only ----
+    match /wallets/{uid} {
+      allow read: if true; // leaderboard needs public read of balances/names
+      allow write: if false;
+    }
+    match /walletTransactions/{uid}/entries/{entryId} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+    match /inventory/{uid}/items/{itemId} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+    match /purchases/{purchaseId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow write: if false;
+    }
+
+    // ---- store catalog: public read, admin/console-seeded only ----
+    match /storeItems/{itemId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ---- Homecoming King/Queen voting ----
+    match /candidates/{candidateId} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.nominatedBy
+        && request.resource.data.voteCount == 0;
+      // voteCount only ever changes via the onVoteWrite Cloud Function trigger.
+      allow update, delete: if false;
+    }
+    match /votes/{voteId} {
+      allow read: if true;
+      allow create, update: if request.auth != null
+        && request.auth.uid == request.resource.data.userId
+        && voteId == request.auth.uid + '_' + request.resource.data.category;
+      allow delete: if false;
+    }
+
+    // ---- org membership + Probate Night ----
+    match /orgMembers/{uid} {
+      allow read: if true;
+      allow create: if request.auth != null && request.auth.uid == uid;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+      allow update: if false;
+    }
+    match /probateSignups/{signupId} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.userId
+        && signupId == request.resource.data.letters + '_' + request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // ---- kickbacks / parties ----
+    match /parties/{partyId} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.hostId
+        && request.resource.data.rsvpCount == 0;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.hostId;
+      // rsvpCount only ever changes via the onRsvpWrite Cloud Function trigger.
+      allow update: if false;
+    }
+    match /partyRsvps/{rsvpId} {
+      allow read: if true;
+      // create and update both allowed: setDoc() on an already-RSVP'd party
+      // (e.g. a repeat click) is a Firestore "update", not a "create" —
+      // this keeps that idempotent, matching the old upsert behavior.
+      allow create, update: if request.auth != null
+        && request.auth.uid == request.resource.data.userId
+        && rsvpId == request.resource.data.partyId + '_' + request.auth.uid;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+
+    // ---- achievements: non-monetary, client-writable like before ----
+    match /achievementProgress/{uid}/unlocked/{achievementId} {
+      allow read: if true;
+      allow create: if request.auth != null && request.auth.uid == uid;
+      allow update, delete: if false;
+    }
+  }
+}

@@ -19,7 +19,7 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   const url = new URL(event.request.url);
-  if (url.origin !== self.location.origin) return; // let Supabase/API calls pass straight through
+  if (url.origin !== self.location.origin) return; // let Firebase/API calls pass straight through
 
   event.respondWith(
     fetch(event.request)

@@ -1,5 +1,5 @@
 import { ACHIEVEMENTS, getUnlocked, onAchievementsChange } from "../achievements.js";
-import { ONLINE } from "../supabase.js";
+import { ONLINE } from "../firebase.js";
 
 export function mountAchievements(root, { onClose } = {}) {
   root.innerHTML = `
@@ -7,7 +7,7 @@ export function mountAchievements(root, { onClose } = {}) {
       <h3>🏅 Homecoming Checklist</h3>
       <p class="corkboard-sub" id="ach-progress"></p>
       <div class="achievement-grid" id="ach-grid"></div>
-      ${ONLINE ? "" : '<p class="corkboard-sub">Saved on this device for now — connect Supabase to carry it across devices and earn Yard Coin for each one.</p>'}
+      ${ONLINE ? "" : '<p class="corkboard-sub">Saved on this device for now — connect Firebase to carry it across devices and earn Yard Coin for each one.</p>'}
       <button class="btn btn-secondary close" style="margin-top:12px;width:100%;">Close</button>
     </div>`;
 

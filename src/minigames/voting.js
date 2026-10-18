@@ -1,4 +1,5 @@
-import { supabase, ONLINE } from "../supabase.js";
+import { collection, doc, addDoc, getDoc, setDoc, query, where, orderBy, onSnapshot, serverTimestamp } from "firebase/firestore";
+import { db, ONLINE } from "../firebase.js";
 import { getState } from "../auth.js";
 import { unlockAchievement } from "../achievements.js";
 
@@ -7,7 +8,7 @@ export function mountVoting(root, { onClose } = {}) {
     root.innerHTML = `
       <div class="modal">
         <h3>🏆 Vote: Mr. / Miss UAPB Homecoming</h3>
-        <p>Nominate and vote for this year's Homecoming King & Queen — one vote per category, change it any time before the polls close. Connect Supabase (see <code>supabase/README.md</code>) to turn this on.</p>
+        <p>Nominate and vote for this year's Homecoming King & Queen — one vote per category, change it any time before the polls close. Connect Firebase (see <code>firebase/README.md</code>) to turn this on.</p>
         <button class="btn btn-primary close" style="width:100%;">Close</button>
       </div>`;
     root.querySelector(".close").addEventListener("click", () => onClose?.());
@@ -16,7 +17,7 @@ export function mountVoting(root, { onClose } = {}) {
 
   const authState = getState();
   let category = "king";
-  let channel = null;
+  let unsubscribe = null;
 
   root.innerHTML = `
     <div class="modal game-modal">
@@ -38,35 +39,21 @@ export function mountVoting(root, { onClose } = {}) {
 
   async function myVote() {
     if (!authState.user) return null;
-    const { data } = await supabase
-      .from("votes")
-      .select("candidate_id")
-      .eq("user_id", authState.user.id)
-      .eq("category", category)
-      .maybeSingle();
-    return data?.candidate_id || null;
+    const snap = await getDoc(doc(db, "votes", `${authState.user.uid}_${category}`));
+    return snap.exists() ? snap.data().candidateId : null;
   }
 
-  async function render() {
-    listEl.innerHTML = "Loading...";
-    const [{ data: tallies, error }, mine] = await Promise.all([
-      supabase.from("candidate_tallies").select("*").eq("category", category).order("vote_count", { ascending: false }),
-      myVote(),
-    ]);
-    if (error) {
-      listEl.textContent = "Couldn't load candidates: " + error.message;
-      return;
-    }
-    if (!tallies?.length) {
+  function renderRows(candidates, mine) {
+    listEl.innerHTML = "";
+    if (!candidates.length) {
       listEl.innerHTML = '<div style="opacity:0.5;font-size:13px;text-align:center;padding:10px;">No nominees yet — add the first one below.</div>';
       return;
     }
-    listEl.innerHTML = "";
-    tallies.forEach((c) => {
+    candidates.forEach((c) => {
       const row = document.createElement("div");
       row.className = "lb-row" + (c.id === mine ? " lb-me" : "");
       row.innerHTML = `
-        <span class="lb-rank">${c.vote_count}</span>
+        <span class="lb-rank">${c.voteCount || 0}</span>
         <span class="lb-name">${c.name}</span>
         <button class="btn ${c.id === mine ? "btn-primary" : "btn-secondary"}" style="padding:6px 12px;font-size:12px;">
           ${c.id === mine ? "Your vote" : "Vote"}
@@ -76,16 +63,30 @@ export function mountVoting(root, { onClose } = {}) {
           alert("Join the Yard first (Sign up / Log in) to vote.");
           return;
         }
-        const { error: voteError } = await supabase
-          .from("votes")
-          .upsert({ user_id: authState.user.id, category, candidate_id: c.id }, { onConflict: "user_id,category" });
-        if (voteError) alert("Couldn't vote: " + voteError.message);
-        else {
+        try {
+          await setDoc(doc(db, "votes", `${authState.user.uid}_${category}`), {
+            userId: authState.user.uid,
+            category,
+            candidateId: c.id,
+            createdAt: serverTimestamp(),
+          });
           unlockAchievement("voter");
-          render();
+        } catch (e) {
+          alert("Couldn't vote: " + e.message);
         }
       });
       listEl.appendChild(row);
+    });
+  }
+
+  function watch() {
+    if (unsubscribe) unsubscribe();
+    listEl.innerHTML = "Loading...";
+    const q = query(collection(db, "candidates"), where("category", "==", category), orderBy("voteCount", "desc"));
+    unsubscribe = onSnapshot(q, async (snap) => {
+      const candidates = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const mine = await myVote();
+      renderRows(candidates, mine);
     });
   }
 
@@ -94,7 +95,7 @@ export function mountVoting(root, { onClose } = {}) {
       root.querySelectorAll(".auth-tab").forEach((t) => t.classList.remove("active"));
       tab.classList.add("active");
       category = tab.dataset.cat;
-      render();
+      watch();
     });
   });
 
@@ -105,24 +106,24 @@ export function mountVoting(root, { onClose } = {}) {
       alert("Join the Yard first (Sign up / Log in) to nominate someone.");
       return;
     }
-    const { error } = await supabase.from("candidates").insert({ category, name, nominated_by: authState.user.id });
-    if (error) alert("Couldn't nominate: " + error.message);
-    else {
+    try {
+      await addDoc(collection(db, "candidates"), {
+        category,
+        name,
+        nominatedBy: authState.user.uid,
+        voteCount: 0,
+        createdAt: serverTimestamp(),
+      });
       nomineeInput.value = "";
-      render();
+    } catch (e) {
+      alert("Couldn't nominate: " + e.message);
     }
   });
 
-  channel = supabase
-    .channel("votes-live")
-    .on("postgres_changes", { event: "*", schema: "public", table: "votes" }, () => render())
-    .on("postgres_changes", { event: "*", schema: "public", table: "candidates" }, () => render())
-    .subscribe();
-
   root.querySelector(".close").addEventListener("click", () => {
-    if (channel) supabase.removeChannel(channel);
+    if (unsubscribe) unsubscribe();
     onClose?.();
   });
 
-  render();
+  watch();
 }

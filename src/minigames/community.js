@@ -1,4 +1,5 @@
-import { supabase, ONLINE } from "../supabase.js";
+import { collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp } from "firebase/firestore";
+import { db, ONLINE } from "../firebase.js";
 import { getState } from "../auth.js";
 import { unlockAchievement } from "../achievements.js";
 
@@ -31,7 +32,7 @@ function escapeHtml(s) {
 
 export function mountCommunity(root, { onClose } = {}) {
   let posts = [];
-  let channel = null;
+  let unsubscribe = null;
 
   root.innerHTML = `
     <div class="modal game-modal">
@@ -39,7 +40,7 @@ export function mountCommunity(root, { onClose } = {}) {
       <p class="corkboard-sub">${
         ONLINE
           ? "Post a request or promo — everyone on the Yard sees it live."
-          : "Post a request or promo for the Yard. Saved on this device for now — connect Supabase for a shared board."
+          : "Post a request or promo for the Yard. Saved on this device for now — connect Firebase for a shared board."
       }</p>
       <div class="corkboard-form">
         <select id="cb-type"></select>
@@ -80,27 +81,19 @@ export function mountCommunity(root, { onClose } = {}) {
     });
   }
 
-  async function loadRemote() {
-    const { data, error } = await supabase
-      .from("corkboard_posts")
-      .select("type, name, msg, created_at")
-      .order("created_at", { ascending: true })
-      .limit(100);
-    if (!error && data) {
-      posts = data.map((d) => ({ type: d.type, name: d.name, msg: d.msg }));
-      render();
-    }
-  }
-
   if (ONLINE) {
-    loadRemote();
-    channel = supabase
-      .channel("corkboard-live")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "corkboard_posts" }, (payload) => {
-        posts.push({ type: payload.new.type, name: payload.new.name, msg: payload.new.msg });
-        render();
-      })
-      .subscribe();
+    const q = query(collection(db, "corkboardPosts"), orderBy("createdAt", "asc"), limit(100));
+    unsubscribe = onSnapshot(q, (snap) => {
+      // Mirror the old insert-only Supabase feed: only react to additions,
+      // ignoring the 'removed' events Firestore can emit when a post ages
+      // out of the limit-100 window (those never happened before).
+      snap.docChanges().forEach((change) => {
+        if (change.type !== "added") return;
+        const d = change.doc.data();
+        posts.push({ type: d.type, name: d.name, msg: d.msg });
+      });
+      render();
+    });
   } else {
     posts = loadLocal();
     render();
@@ -117,11 +110,16 @@ export function mountCommunity(root, { onClose } = {}) {
         alert("Join the Yard first (Sign up / Log in) to post to the shared corkboard.");
         return;
       }
-      const { error } = await supabase
-        .from("corkboard_posts")
-        .insert({ user_id: authState.user.id, type, name: escapeHtml(name), msg: escapeHtml(msg) });
-      if (error) {
-        alert("Couldn't post: " + error.message);
+      try {
+        await addDoc(collection(db, "corkboardPosts"), {
+          userId: authState.user.uid,
+          type,
+          name: escapeHtml(name),
+          msg: escapeHtml(msg),
+          createdAt: serverTimestamp(),
+        });
+      } catch (e) {
+        alert("Couldn't post: " + e.message);
         return;
       }
     } else {
@@ -134,7 +132,7 @@ export function mountCommunity(root, { onClose } = {}) {
   });
 
   root.querySelector(".close").addEventListener("click", () => {
-    if (channel) supabase.removeChannel(channel);
+    if (unsubscribe) unsubscribe();
     onClose?.();
   });
 }

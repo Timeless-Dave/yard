@@ -2,7 +2,7 @@
 
 A 3D homecoming-themed campus game built on the real University of Arkansas
 at Pine Bluff campus (positions sourced from OpenStreetMap), with nostalgia
-minigames, real weather/day-night, and optional Supabase-backed multiplayer,
+minigames, real weather/day-night, and optional Firebase-backed multiplayer,
 accounts, and an economy.
 
 ## Run it
@@ -17,9 +17,9 @@ no setup required.
 
 ## Turning on multiplayer, accounts, voting, the store, etc.
 
-All of that is optional and backed by a free Supabase project. See
-[`supabase/README.md`](supabase/README.md) for setup. Until it's configured,
-every online feature shows a clear "connect Supabase" message instead of
+All of that is optional and backed by a free Firebase project. See
+[`firebase/README.md`](firebase/README.md) for setup. Until it's configured,
+every online feature shows a clear "connect Firebase" message instead of
 failing silently.
 
 ## Install as an app
@@ -51,7 +51,11 @@ few platforms don't resolve relative image URLs correctly.
   step show, store, voting, parties, etc.) as its own module.
 - `src/weather.js`, `src/seasonal.js` — live weather/day-night and date-gated
   seasonal events.
-- `src/auth.js`, `src/multiplayer.js`, `src/economy.js`, `src/supabase.js` —
-  the Supabase-backed layer; all degrade gracefully when unconfigured.
-- `supabase/migrations/` — run in order in the Supabase SQL Editor to turn on
-  the backend. `supabase/functions/` — Stripe Checkout Edge Functions.
+- `src/auth.js`, `src/multiplayer.js`, `src/economy.js`, `src/firebase.js` —
+  the Firebase-backed layer; all degrade gracefully when unconfigured.
+- `firestore.rules`, `firestore.indexes.json`, `database.rules.json` — the
+  Firestore/Realtime Database security rules and indexes.
+- `functions/` — Cloud Functions: the coin-economy transactions and Stripe
+  Checkout, deployed with `firebase deploy --only functions`.
+- `scripts/seedStoreItems.mjs` — one-off Admin SDK script that seeds the
+  store catalog (Firestore has no client write policy on `storeItems`).

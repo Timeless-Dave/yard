@@ -1,4 +1,5 @@
-import { supabase, ONLINE } from "./supabase.js";
+import { collection, doc, getDocs, setDoc, serverTimestamp } from "firebase/firestore";
+import { db, ONLINE } from "./firebase.js";
 import { getState } from "./auth.js";
 import { earnCoins } from "./economy.js";
 import { playSuccess } from "./sound.js";
@@ -61,8 +62,8 @@ export function getUnlocked() {
 async function syncFromServer() {
   const { user } = getState();
   if (!ONLINE || !user) return;
-  const { data } = await supabase.from("achievement_progress").select("achievement_id").eq("user_id", user.id);
-  (data || []).forEach((row) => unlocked.add(row.achievement_id));
+  const snap = await getDocs(collection(db, "achievementProgress", user.uid, "unlocked"));
+  snap.forEach((d) => unlocked.add(d.id));
   saveLocal(unlocked);
   emit();
 }
@@ -95,7 +96,7 @@ export async function unlockAchievement(id) {
 
   const { user } = getState();
   if (ONLINE && user) {
-    await supabase.from("achievement_progress").insert({ user_id: user.id, achievement_id: id }).select();
+    await setDoc(doc(db, "achievementProgress", user.uid, "unlocked", id), { earnedAt: serverTimestamp() });
     earnCoins(BONUS_COINS, "achievement: " + achievement.name);
   }
 }
