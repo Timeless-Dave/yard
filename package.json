@@ -14,7 +14,8 @@
     "test:mobile": "node tests/e2e/mobile.mjs",
     "test:all": "npm test && npm run test:emulator && npm run test:e2e && npm run test:mobile",
     "seed:store": "node scripts/seedStoreItems.mjs",
-    "set-admin": "node scripts/setAdmin.mjs"
+    "set-admin": "node scripts/setAdmin.mjs",
+    "test:live": "node tests/e2e/live-smoke.mjs https://timeless-dave.github.io/yard/"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^6.0.0",
