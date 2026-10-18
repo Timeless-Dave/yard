@@ -12,7 +12,7 @@ export const BUILDINGS = [
   { name: "Administration Building", kind: "academic", special: "columns", color: "#8a3b2b", x: 60.0, z: -66.6, w: 11.0, h: 9, d: 7.7 },
   { name: "Dawson-Hicks Hall", kind: "academic", color: "#5a4a8a", x: 13.5, z: 34.0, w: 8.8, h: 7, d: 6.6 },
   { name: "Hathaway-Howard Fine Arts Center", kind: "arts", special: "fine_arts", color: "#7a2d8a", x: 26.1, z: 57.7, w: 9.9, h: 7, d: 7.2 },
-  { name: "Caldwell Hall", kind: "academic", color: "#3a5c8a", x: 32.3, z: 0.7, w: 7.7, h: 6, d: 6.1 },
+  { name: "Caldwell Hall", kind: "academic", special: "caldwell", color: "#3a5c8a", x: 32.3, z: 0.7, w: 7.7, h: 6, d: 6.1 },
   { name: "STEM Building", kind: "academic", special: "stem", color: "#2d6b8a", x: -98.4, z: -73.1, w: 9.9, h: 8, d: 7.2 },
   { name: "Walker Research Center", kind: "academic", color: "#3a5c8a", x: -23.1, z: -55.1, w: 7.2, h: 6, d: 5.5 },
   { name: "Fitness Center", kind: "athletics", color: "#2d6b4a", x: -1.5, z: -67.8, w: 7.7, h: 6, d: 6.1 },
