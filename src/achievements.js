@@ -24,6 +24,7 @@ export const ACHIEVEMENTS = [
   { id: "photo_op", icon: "📸", name: "Photo Op", desc: "Snap a photo at the Homecoming arch" },
   { id: "rope_champ", icon: "🪢", name: "Rope Champ", desc: "S grade in Double Dutch" },
   { id: "hopscotch_champ", icon: "🩴", name: "Hopscotch Champ", desc: "S grade in Hopscotch" },
+  { id: "dj_yard", icon: "📻", name: "DJ on the Yard", desc: "Turn on the boombox" },
 ];
 
 function loadLocal() {
