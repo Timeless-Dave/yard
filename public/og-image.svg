@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#121212"/>
+  <rect x="0" y="0" width="1200" height="630" fill="none" stroke="#f4b223" stroke-width="10"/>
+  <circle cx="300" cy="315" r="170" fill="none" stroke="#f4b223" stroke-width="12"/>
+  <text x="300" y="365" font-family="Georgia, 'Times New Roman', serif" font-size="200" font-weight="700" fill="#f4b223" text-anchor="middle">Y</text>
+  <text x="560" y="300" font-family="-apple-system, Arial, sans-serif" font-size="78" font-weight="800" fill="#ffffff">THE YARD</text>
+  <text x="560" y="365" font-family="-apple-system, Arial, sans-serif" font-size="40" font-weight="700" fill="#f4b223">UAPB Homecoming</text>
+  <text x="560" y="420" font-family="-apple-system, Arial, sans-serif" font-size="26" fill="#cfcfcf">Walk the real campus. Play. Hang out.</text>
+</svg>

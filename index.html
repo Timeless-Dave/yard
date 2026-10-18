@@ -12,6 +12,17 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="The Yard" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="The Yard — UAPB Homecoming" />
+    <meta property="og:description" content="Walk the real UAPB campus, play nostalgia minigames, and hang out with other Golden Lions." />
+    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="The Yard — UAPB Homecoming" />
+    <meta name="twitter:description" content="Walk the real UAPB campus, play nostalgia minigames, and hang out with other Golden Lions." />
+    <meta name="twitter:image" content="/og-image.png" />
     <style>
       :root {
         --gold: #f4b223;
@@ -240,6 +251,12 @@
       .achievement-toast.show { top: 16px; }
       .achievement-toast-icon { font-size: 26px; }
 
+      .onboarding-modal { max-width: 440px; }
+      .onboard-section {
+        display: flex; gap: 12px; align-items: flex-start; margin: 14px 0;
+      }
+      .onboard-icon { font-size: 26px; flex-shrink: 0; width: 32px; text-align: center; }
+
       .interact-prompt {
         position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%);
         background: rgba(244,178,35,0.95); color: var(--black); padding: 8px 16px;
@@ -329,6 +346,7 @@
           <div class="chip" data-modal="store">🛍️ Store</div>
           <div class="chip" data-modal="parties">🎉 Parties</div>
           <div class="chip" data-modal="achievements">🏅 Checklist</div>
+          <div class="chip" data-modal="onboarding">❓ How to Play</div>
           <div class="chip" id="night-toggle">🌙 Night Mode</div>
           <div class="chip hidden" id="install-chip">📲 Install App</div>
           <div class="chip" id="sound-toggle">🔊 Sound</div>
