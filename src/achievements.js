@@ -23,6 +23,7 @@ export const ACHIEVEMENTS = [
   { id: "band_fan", icon: "🎺", name: "M4 Fan", desc: "Cheer the Marching Musical Machine of the Mid-South" },
   { id: "photo_op", icon: "📸", name: "Photo Op", desc: "Snap a photo at the Homecoming arch" },
   { id: "rope_champ", icon: "🪢", name: "Rope Champ", desc: "S grade in Double Dutch" },
+  { id: "hopscotch_champ", icon: "🩴", name: "Hopscotch Champ", desc: "S grade in Hopscotch" },
 ];
 
 function loadLocal() {

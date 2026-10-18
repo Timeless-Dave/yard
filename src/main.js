@@ -23,6 +23,7 @@ import { mountBand } from "./minigames/band.js";
 import { createPhotoBoothArch } from "./photobooth.js";
 import { mountPhotoBooth } from "./minigames/photobooth.js";
 import { mountDoubleDutch } from "./minigames/doubledutch.js";
+import { mountHopscotch } from "./minigames/hopscotch.js";
 import { initMinimap } from "./minimap.js";
 import { playOpen, playClose, playClick, isMuted, toggleMuted } from "./sound.js";
 import { mountAchievements } from "./minigames/achievements.js";
@@ -661,6 +662,49 @@ ddSign.position.set(DD_X, 1.9, DD_Z);
 scene.add(ddSign);
 interactionZones.push({ x: DD_X, z: DD_Z, radius: 3, key: "doubledutch", label: "Jump in on Double Dutch" });
 
+// ---- Hopscotch grid — chalk on the sidewalk ----
+const HS_X = 18,
+  HS_Z = -6;
+const hopscotchGrid = new THREE.Mesh(
+  new THREE.PlaneGeometry(2.4, 3.6),
+  new THREE.MeshStandardMaterial({
+    map: canvasTexture((ctx, w, h) => {
+      ctx.fillStyle = "#5a4a3a";
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = "#e8e2d0";
+      ctx.lineWidth = 4;
+      const rows = [[1], [2, 3], [4], [5, 6], [7], [8]];
+      const rowH = h / rows.length;
+      let n = 1;
+      rows.forEach((row, r) => {
+        const y = r * rowH;
+        if (row.length === 1) {
+          ctx.strokeRect(w * 0.25, y, w * 0.5, rowH);
+          ctx.fillStyle = "#e8e2d0";
+          ctx.font = "bold 28px sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText(String(n), w / 2, y + rowH * 0.65);
+          n++;
+        } else {
+          ctx.strokeRect(0, y, w / 2, rowH);
+          ctx.strokeRect(w / 2, y, w / 2, rowH);
+          ctx.fillStyle = "#e8e2d0";
+          ctx.font = "bold 28px sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText(String(n), w / 4, y + rowH * 0.65);
+          ctx.fillText(String(n + 1), (w * 3) / 4, y + rowH * 0.65);
+          n += 2;
+        }
+      });
+    }, 192, 288),
+  })
+);
+hopscotchGrid.rotation.x = -Math.PI / 2;
+hopscotchGrid.position.set(HS_X, 0.02, HS_Z);
+hopscotchGrid.receiveShadow = true;
+scene.add(hopscotchGrid);
+interactionZones.push({ x: HS_X, z: HS_Z, radius: 3, key: "hopscotch", label: "Play Hopscotch" });
+
 // ---- Pager / beeper booth ----
 createBuilding({ x: 22, z: 22, w: 3, h: 3.6, d: 3, color: 0xd9272e, label: "Page Somebody" });
 interactionZones.push({ x: 22, z: 22, radius: 3, key: "pager", label: "Check the pager" });
@@ -930,6 +974,7 @@ const MINIGAMES = {
   onboarding: mountOnboarding,
   band: mountBand,
   doubledutch: mountDoubleDutch,
+  hopscotch: mountHopscotch,
   photobooth: (root, opts) =>
     mountPhotoBooth(root, {
       ...opts,
