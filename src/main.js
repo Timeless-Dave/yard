@@ -22,6 +22,7 @@ import { createMarchingBand } from "./band.js";
 import { mountBand } from "./minigames/band.js";
 import { createPhotoBoothArch } from "./photobooth.js";
 import { mountPhotoBooth } from "./minigames/photobooth.js";
+import { mountDoubleDutch } from "./minigames/doubledutch.js";
 import { initMinimap } from "./minimap.js";
 import { playOpen, playClose, playClick, isMuted, toggleMuted } from "./sound.js";
 import { mountAchievements } from "./minigames/achievements.js";
@@ -631,6 +632,35 @@ domLeg.position.set(-18, 0.375, -16);
 scene.add(domLeg);
 interactionZones.push({ x: -18, z: -16, radius: 3, key: "dominoes", label: "Pull up to the dominoes" });
 
+// ---- Double Dutch ropes — the classic block/sidewalk game ----
+const DD_X = -85,
+  DD_Z = 30;
+[-1.8, 1.8].forEach((ox) => {
+  const pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.08, 0.1, 1.6, 8),
+    new THREE.MeshStandardMaterial({ color: 0x3a2a1a })
+  );
+  pole.position.set(DD_X + ox, 0.8, DD_Z);
+  pole.castShadow = true;
+  scene.add(pole);
+});
+const ddSign = new THREE.Mesh(
+  new THREE.PlaneGeometry(2.8, 0.7),
+  new THREE.MeshStandardMaterial({
+    map: canvasTexture((ctx, w, h) => {
+      ctx.fillStyle = "#121212";
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = "#f4b223";
+      ctx.font = "bold 24px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("🪢 DOUBLE DUTCH", w / 2, h / 2 + 8);
+    }, 320, 100),
+  })
+);
+ddSign.position.set(DD_X, 1.9, DD_Z);
+scene.add(ddSign);
+interactionZones.push({ x: DD_X, z: DD_Z, radius: 3, key: "doubledutch", label: "Jump in on Double Dutch" });
+
 // ---- Pager / beeper booth ----
 createBuilding({ x: 22, z: 22, w: 3, h: 3.6, d: 3, color: 0xd9272e, label: "Page Somebody" });
 interactionZones.push({ x: 22, z: 22, radius: 3, key: "pager", label: "Check the pager" });
@@ -899,6 +929,7 @@ const MINIGAMES = {
   achievements: mountAchievements,
   onboarding: mountOnboarding,
   band: mountBand,
+  doubledutch: mountDoubleDutch,
   photobooth: (root, opts) =>
     mountPhotoBooth(root, {
       ...opts,
