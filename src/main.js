@@ -20,6 +20,8 @@ import { createRoadNetwork, createTraffic } from "./traffic.js";
 import { createPedestrians } from "./pedestrians.js";
 import { createMarchingBand } from "./band.js";
 import { mountBand } from "./minigames/band.js";
+import { createPhotoBoothArch } from "./photobooth.js";
+import { mountPhotoBooth } from "./minigames/photobooth.js";
 import { initMinimap } from "./minimap.js";
 import { playOpen, playClose, playClick, isMuted, toggleMuted } from "./sound.js";
 import { mountAchievements } from "./minigames/achievements.js";
@@ -448,6 +450,10 @@ if (stadiumBuilding) {
   band = createMarchingBand(scene, bx, bz);
   interactionZones.push({ x: bx, z: bz + 2, radius: 8, key: "band", label: "Cheer for M4" });
 }
+
+// Homecoming photo-op arch near the Bell Tower plaza.
+createPhotoBoothArch(scene, -6, 8, CAMPUS_META.shortName);
+interactionZones.push({ x: -6, z: 8, radius: 3, key: "photobooth", label: "Take a photo" });
 
 RETAIL_NEAR_UNION.forEach((r) => {
   interactionZones.push({ x: r.x, z: r.z, radius: 3, key: "shopnote", label: `Visit ${r.name}`, note: r.name });
@@ -893,6 +899,19 @@ const MINIGAMES = {
   achievements: mountAchievements,
   onboarding: mountOnboarding,
   band: mountBand,
+  photobooth: (root, opts) =>
+    mountPhotoBooth(root, {
+      ...opts,
+      campusLabel: CAMPUS_META.shortName,
+      capture: () => {
+        // The renderer isn't created with preserveDrawingBuffer (that costs
+        // perf every frame), so re-render synchronously right before
+        // reading pixels — otherwise toDataURL() reads an already-cleared
+        // buffer and comes back blank.
+        renderer.render(scene, camera);
+        return renderer.domElement.toDataURL("image/png");
+      },
+    }),
 };
 
 function closeModal() {
