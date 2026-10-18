@@ -15,13 +15,16 @@ export async function publishPost(ref, data) {
   if (!user) return { ok: false, error: "Join the Yard first (Sign up / Log in)." };
   if (banned) return { ok: false, error: "Your account has been suspended from posting." };
   if (Date.now() - lastPostAt < POST_INTERVAL_MS) return { ok: false, error: "Slow down a sec — one post every few seconds." };
+  // Start the clock at send time, not on confirmation: Firestore shows a post
+  // locally before the server acks it, so a quick second send would
+  // otherwise slip past this check while the first is still in flight.
+  lastPostAt = Date.now();
 
   const batch = writeBatch(db);
   batch.set(ref, { ...data, createdAt: serverTimestamp(), hidden: false, reportCount: 0 });
   batch.set(doc(db, "rateLimits", user.uid), { lastPostAt: serverTimestamp() });
   try {
     await batch.commit();
-    lastPostAt = Date.now();
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e.code === "permission-denied" ? "Couldn't post that — try again in a few seconds." : e.message };

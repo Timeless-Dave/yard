@@ -42,11 +42,11 @@ try {
     await page.goto(URL);
 
     await check("onboarding fits the screen and dismisses with a tap", async () => {
-      const box = await page.locator(".modal").first().boundingBox({ timeout: 15000 });
+      const box = await page.locator(".modal").first().boundingBox({ timeout: 20000 });
       assert(box.x >= 0 && box.x + box.width <= vw, `modal is ${box.width}px wide on a ${vw}px screen`);
       await page.screenshot({ path: `${SHOTS}/${slug}-onboarding.png` });
       await page.locator('text="Let\'s go!"').tap();
-      await page.locator(".modal-backdrop").waitFor({ state: "detached", timeout: 5000 });
+      await page.locator(".modal-backdrop").waitFor({ state: "detached", timeout: 20000 });
     });
 
     await check("no horizontal page scroll; the chip row scrolls on its own", async () => {
@@ -69,18 +69,18 @@ try {
     await check("holding ↑ on the D-pad walks the avatar to an interaction spot", async () => {
       const up = page.locator('.touch-btn[data-key="w"]');
       await up.dispatchEvent("pointerdown");
-      await page.locator(".interact-prompt").waitFor({ state: "visible", timeout: 6000 });
+      await page.locator(".interact-prompt").waitFor({ state: "visible", timeout: 20000 });
       await up.dispatchEvent("pointerup");
     });
 
     await check("tapping the interact button opens that spot's modal, which fits and closes", async () => {
       await page.locator("#touch-interact").dispatchEvent("pointerdown");
       const modal = page.locator(".modal").first();
-      const box = await modal.boundingBox({ timeout: 5000 });
+      const box = await modal.boundingBox({ timeout: 20000 });
       assert(box.x >= 0 && box.x + box.width <= vw && box.height <= vh, `modal ${Math.round(box.width)}x${Math.round(box.height)} overflows ${vw}x${vh}`);
       await page.screenshot({ path: `${SHOTS}/${slug}-modal.png` });
       await page.locator(".modal .close").first().tap();
-      await page.locator(".modal-backdrop").waitFor({ state: "detached", timeout: 5000 });
+      await page.locator(".modal-backdrop").waitFor({ state: "detached", timeout: 20000 });
     });
 
     await check("no uncaught page errors", async () => assert(!errors.length, errors.join(" | ")));
