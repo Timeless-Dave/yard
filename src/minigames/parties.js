@@ -1,6 +1,7 @@
 import { supabase, ONLINE } from "../supabase.js";
 import { getState } from "../auth.js";
-import { PARTY_SPOTS } from "../partySpots.js";
+import { getActiveCampus } from "../campuses.js";
+const { PARTY_SPOTS } = getActiveCampus().data;
 import { unlockAchievement } from "../achievements.js";
 
 const VIBES = [

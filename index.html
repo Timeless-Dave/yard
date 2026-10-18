@@ -330,10 +330,11 @@
   <body>
     <div id="app">
       <div class="topbar">
-        <div class="brand"><span class="dot"></span> The Yard — UAPB</div>
-        <div class="chip" id="weather-badge" title="Live weather · Pine Bluff, AR">☀️</div>
+        <div class="brand"><span class="dot"></span> <span id="brand-text">The Yard</span></div>
+        <div class="chip" id="weather-badge" title="Live weather">☀️</div>
         <div class="chip-row">
-          <div class="chip" data-modal="king">🏆 Vote Mr./Miss UAPB</div>
+          <div class="chip" id="campus-switch">🏫 Campus</div>
+          <div class="chip" data-modal="king" id="vote-chip">🏆 Vote King/Queen</div>
           <div class="chip" data-modal="plots">🏠 Dorm &amp; Plot Lines</div>
           <div class="chip" data-modal="billboards">📢 Billboards</div>
           <div class="chip" data-modal="cards">♠ Spades Table</div>
@@ -368,7 +369,7 @@
       <canvas class="minimap" id="minimap" width="160" height="160"></canvas>
 
       <div class="bottom-card">
-        <div class="label" id="player-count-label"><b>2,847</b> Golden Lions on the Yard · free</div>
+        <div class="label" id="player-count-label"><b>2,847</b> on the Yard · free</div>
         <button class="btn btn-primary" data-modal="auth">Sign up free</button>
         <button class="btn btn-secondary" data-modal="auth">Log in</button>
       </div>
