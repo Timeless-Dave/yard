@@ -4,7 +4,6 @@ import { earnCoins } from "../economy.js";
 import { playSuccess, playFail } from "../sound.js";
 import { unlockAchievement } from "../achievements.js";
 
-const GRADE_COINS = { S: 100, A: 70, B: 40, C: 15 };
 const SQUARES = 8;
 const HOP_MS = 950;
 
@@ -108,10 +107,8 @@ export function mountHopscotch(root, { onClose } = {}) {
     again.addEventListener("click", () => mountHopscotch(root, { onClose }));
     root.querySelector(".game-modal").insertBefore(again, root.querySelector(".close"));
     gridEl.querySelectorAll(".hopscotch-sq").forEach((el) => (el.style.pointerEvents = "none"));
-
-    const coins = GRADE_COINS[grade];
-    earnCoins(coins, "hopscotch grade " + grade).then((r) => {
-      if (r.ok) logEl.innerHTML += ` <br/>+${coins} 🪙 (${r.balance} total)`;
+    earnCoins("hopscotch", { grade }).then((r) => {
+      if (r.ok) logEl.innerHTML += ` <br/>+${r.amount} 🪙 (${r.balance} total)`;
     });
     window.removeEventListener("keydown", onKey);
   }

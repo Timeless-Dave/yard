@@ -16,7 +16,7 @@ export function mountBand(root, { onClose } = {}) {
   root.querySelector("#band-cheer").addEventListener("click", () => {
     playDrumline();
     unlockAchievement("band_fan");
-    earnCoins(10, "cheered for M4");
+    earnCoins("band_cheer");
   });
   root.querySelector(".close").addEventListener("click", () => onClose?.());
 }

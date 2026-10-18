@@ -1,6 +1,7 @@
 import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { db, ONLINE } from "../firebase.js";
 import { getState } from "../auth.js";
+import { esc } from "../text.js";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
@@ -9,7 +10,7 @@ export function mountLeaderboard(root, { onClose } = {}) {
     root.innerHTML = `
       <div class="modal">
         <h3>🏅 Yard Leaderboard</h3>
-        <p>Rankings are powered by real Yard Coin earnings across every player. Connect Firebase (see <code>firebase/README.md</code>) to turn this on.</p>
+        <p>Rankings are powered by real Yard Coin earnings across every player. Online play isn't switched on for this copy of The Yard yet.</p>
         <button class="btn btn-primary close" style="width:100%;">Close</button>
       </div>`;
     root.querySelector(".close").addEventListener("click", () => onClose?.());
@@ -40,8 +41,8 @@ export function mountLeaderboard(root, { onClose } = {}) {
         rowEl.className = "lb-row" + (row.id === myId ? " lb-me" : "");
         rowEl.innerHTML = `
           <span class="lb-rank">${MEDALS[i] || "#" + (i + 1)}</span>
-          <span class="lb-name">${row.displayName || "Golden Lion"}</span>
-          <span class="lb-coins">🪙 ${row.lifetimeEarned}</span>`;
+          <span class="lb-name">${esc(row.displayName || "Golden Lion")}</span>
+          <span class="lb-coins">🪙 ${Number(row.lifetimeEarned) || 0}</span>`;
         listEl.appendChild(rowEl);
       });
     })

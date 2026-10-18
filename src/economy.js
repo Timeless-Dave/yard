@@ -52,16 +52,18 @@ export function stopWatchingWallet() {
   emit();
 }
 
-// Returns { ok, balance, error }. Never throws — callers can always render a result.
-export async function earnCoins(amount, reason) {
+// Reports what happened (a source from functions/gameRules.js, plus a grade
+// or achievementId); the server decides the payout and enforces cooldowns
+// and the daily cap. Returns { ok, balance, amount, error } and never throws.
+export async function earnCoins(source, { grade, achievementId } = {}) {
   const { user } = getState();
   if (!ONLINE || !user) return { ok: false, error: "offline" };
   try {
-    const { data } = await httpsCallable(functions, "earnCoins")({ amount, reason });
+    const { data } = await httpsCallable(functions, "earnCoins")({ source, grade, achievementId });
     balance = data.balance;
     emit();
     playCoin();
-    return { ok: true, balance: data.balance };
+    return { ok: true, balance: data.balance, amount: data.amount };
   } catch (e) {
     return { ok: false, error: e.message };
   }

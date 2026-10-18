@@ -10,9 +10,13 @@ import { mountPlotClaim } from "./minigames/plotClaim.js";
 import { mountLeaderboard } from "./minigames/leaderboard.js";
 import { mountVoting } from "./minigames/voting.js";
 import { mountStore } from "./minigames/store.js";
-import { isHalloween } from "./seasonal.js";
+import { isHalloween, isPrettyWednesday } from "./seasonal.js";
 import { mountParties } from "./minigames/parties.js";
 import { mountVending } from "./minigames/vending.js";
+import { mountChat } from "./minigames/chat.js";
+import { mountLionsDen } from "./minigames/lionsden.js";
+import { mountModQueue } from "./minigames/modqueue.js";
+import { mountGuidelines } from "./minigames/guidelines.js";
 import { startWeatherLoop, onWeatherChange, setWeatherLocation } from "./weather.js";
 import { getActiveCampus, setActiveCampusId, CAMPUSES } from "./campuses.js";
 import { createBellTower, createAcademicHall, createModernHall, createDormHall, createStadiumComplex, createStudentUnion, createLibrary, createGymComplex, createFineArtsCenter, createSTEMBuilding, createCaldwellHall } from "./buildings.js";
@@ -802,6 +806,30 @@ function createVendingMachine(x, z) {
 }
 VENDING_SPOTS.forEach(([x, z]) => createVendingMachine(x, z));
 
+// ---- The Lions Den — campus hangout spot, hosts Pretty Wednesday.
+// UAPB-only (it's a Golden Lions thing) until another campus gets its own. ----
+const PRETTY_WEDNESDAY = isPrettyWednesday();
+if (CAMPUS_META.mascot === "Golden Lions") {
+  const DEN_X = -45,
+    DEN_Z = -5;
+  createBuilding({
+    x: DEN_X,
+    z: DEN_Z,
+    w: 6,
+    h: 3.2,
+    d: 5,
+    color: PRETTY_WEDNESDAY ? 0xf4b223 : 0x1a1a1a,
+    label: PRETTY_WEDNESDAY ? "✨ Lions Den ✨" : "Lions Den",
+  });
+  interactionZones.push({
+    x: DEN_X,
+    z: DEN_Z + 3,
+    radius: 4,
+    key: "lionsden",
+    label: PRETTY_WEDNESDAY ? "✨ Pretty Wednesday at the Lions Den" : "Pull up to the Lions Den",
+  });
+}
+
 // ---- Seasonal: Halloween "Harvest Bash" decorations ----
 function createPumpkin(x, z) {
   const body = new THREE.Mesh(
@@ -825,7 +853,10 @@ if (isHalloween()) {
   ];
   pumpkinSpots.forEach(([x, z]) => createPumpkin(x, z));
   const banner = document.getElementById("announce-banner");
-  if (banner) banner.innerHTML = '🎃 <b>@GoldenLion_23</b>: Harvest Bash is live — check the store for the Halloween drop';
+  if (banner) banner.innerHTML = '🎃 <b>The Yard</b>: Harvest Bash is live — check the store for the Halloween drop';
+} else if (PRETTY_WEDNESDAY && CAMPUS_META.mascot === "Golden Lions") {
+  const banner = document.getElementById("announce-banner");
+  if (banner) banner.innerHTML = '✨ <b>The Yard</b>: It\'s Pretty Wednesday — pull up to the Lions Den looking right';
 }
 
 // ---- Trees (scattered, avoiding the Bell Tower plaza and building footprints) ----
@@ -997,6 +1028,10 @@ const MINIGAMES = {
   pager: mountPager,
   cookout: mountCookout,
   community: mountCommunity,
+  chat: mountChat,
+  lionsden: mountLionsDen,
+  modqueue: mountModQueue,
+  guidelines: mountGuidelines,
   leaderboard: mountLeaderboard,
   king: mountVoting,
   store: mountStore,
@@ -1023,48 +1058,49 @@ const MINIGAMES = {
     }),
 };
 
+// Modals with live Firestore listeners return a cleanup function; it runs on
+// every close path (button, backdrop, or opening another modal) so a closed
+// modal never keeps listening — and billing reads — in the background.
+let modalCleanup = null;
+
+function runModalCleanup() {
+  if (typeof modalCleanup === "function") modalCleanup();
+  modalCleanup = null;
+}
+
 function closeModal() {
+  runModalCleanup();
   modalRoot.innerHTML = "";
   playClose();
+}
+
+function mountInBackdrop(mount) {
+  runModalCleanup();
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  modalRoot.innerHTML = "";
+  modalRoot.appendChild(backdrop);
+  modalCleanup = mount(backdrop);
+  backdrop.addEventListener("click", (e) => {
+    if (e.target === backdrop) closeModal();
+  });
 }
 
 function openModal(key, zoneNote) {
   playOpen();
   if (key === "plots") {
-    const backdrop = document.createElement("div");
-    backdrop.className = "modal-backdrop";
-    modalRoot.innerHTML = "";
-    modalRoot.appendChild(backdrop);
-    mountPlotClaim(backdrop, { letters: zoneNote, onClose: closeModal });
-    backdrop.addEventListener("click", (e) => {
-      if (e.target === backdrop) closeModal();
-    });
+    mountInBackdrop((root) => mountPlotClaim(root, { letters: zoneNote, onClose: closeModal }));
     return;
   }
-
   if (key === "auth") {
-    const backdrop = document.createElement("div");
-    backdrop.className = "modal-backdrop";
-    modalRoot.innerHTML = "";
-    modalRoot.appendChild(backdrop);
-    mountAuthModal(backdrop, { onClose: closeModal });
-    backdrop.addEventListener("click", (e) => {
-      if (e.target === backdrop) closeModal();
-    });
+    mountInBackdrop((root) => mountAuthModal(root, { onClose: closeModal, openModal }));
     return;
   }
-
   if (MINIGAMES[key]) {
-    const backdrop = document.createElement("div");
-    backdrop.className = "modal-backdrop";
-    modalRoot.innerHTML = "";
-    modalRoot.appendChild(backdrop);
-    MINIGAMES[key](backdrop, { onClose: closeModal });
-    backdrop.addEventListener("click", (e) => {
-      if (e.target === backdrop) closeModal();
-    });
+    mountInBackdrop((root) => MINIGAMES[key](root, { onClose: closeModal }));
     return;
   }
+  runModalCleanup();
 
   const c = modalContent[key];
   if (!c) return;
@@ -1098,20 +1134,40 @@ function updatePlayerCountLabel() {
   playerCountEl.innerHTML = `<b>${count}</b> ${CAMPUS_META.mascot} on the Yard · free`;
 }
 
+// Auth state fires on every profile change (rename, equip), so presence and
+// the wallet listener only restart when the signed-in account itself changes.
+let presenceUid = null;
 onAuthChange(async (state) => {
   authUser = state.user;
   if (!ONLINE) return;
-  if (state.user) {
-    await joinPresence(state.user.uid, state.profile);
-    setMyIdentity(state.profile?.display_name || "Golden Lion", state.profile?.color || "#f4b223");
-    watchWallet(state.user.uid);
-    if (state.profile?.color) torso.material.color.set(state.profile.color);
-  } else {
-    leavePresence();
-    stopWatchingWallet();
+  const uid = state.user?.uid ?? null;
+  if (uid !== presenceUid) {
+    if (presenceUid) {
+      leavePresence();
+      stopWatchingWallet();
+    }
+    presenceUid = uid;
+    if (uid) {
+      await joinPresence(uid, state.profile);
+      watchWallet(uid);
+    }
   }
+  if (uid && state.profile) {
+    setMyIdentity(state.profile.display_name || "Golden Lion", state.profile.color || "#f4b223");
+    torso.material.color.set(state.profile.color || "#f4b223");
+  }
+  updateAuthButtons(state);
   updatePlayerCountLabel();
 });
+
+// Signed in: hide "Sign up", turn "Log in" into an account button.
+function updateAuthButtons(state) {
+  document.querySelectorAll('[data-modal="auth"]').forEach((btn) => {
+    btn.dataset.label ??= btn.textContent;
+    if (btn.classList.contains("btn-primary")) btn.classList.toggle("hidden", Boolean(state.user));
+    else btn.textContent = state.user ? `👤 ${state.profile?.display_name || "Account"}` : btn.dataset.label;
+  });
+}
 
 const walletBadgeEl = document.getElementById("wallet-badge");
 onBalanceChange((balance) => {
@@ -1232,7 +1288,7 @@ if (ONLINE) {
   // that cross their start time between writes — onSnapshot alone only
   // fires on document changes, not as time passes.
   let notYetEnded = [];
-  const q = query(collection(db, "parties"), where("endsAt", ">=", new Date()));
+  const q = query(collection(db, "parties"), where("hidden", "==", false), where("endsAt", ">=", new Date()));
   onSnapshot(q, (snap) => {
     notYetEnded = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     syncLiveParties(notYetEnded.filter((p) => p.startsAt.toMillis() <= Date.now()));
@@ -1319,7 +1375,7 @@ if (!hasSeenOnboarding()) {
 // ---- PWA install ----
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {});
+    navigator.serviceWorker.register(import.meta.env.BASE_URL + "sw.js").catch(() => {});
   });
 }
 

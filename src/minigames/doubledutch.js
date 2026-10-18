@@ -6,7 +6,6 @@ import { earnCoins } from "../economy.js";
 import { playSuccess, playFail } from "../sound.js";
 import { unlockAchievement } from "../achievements.js";
 
-const GRADE_COINS = { S: 100, A: 70, B: 40, C: 15 };
 const TURN_MS = 800;
 const TOTAL_JUMPS = 10;
 
@@ -102,10 +101,8 @@ export function mountDoubleDutch(root, { onClose } = {}) {
     again.addEventListener("click", () => mountDoubleDutch(root, { onClose }));
     root.querySelector(".game-modal").insertBefore(again, root.querySelector(".close"));
     root.querySelector("#dd-jump").disabled = true;
-
-    const coins = GRADE_COINS[grade];
-    earnCoins(coins, "double dutch grade " + grade).then((r) => {
-      if (r.ok) logEl.innerHTML += ` <br/>+${coins} 🪙 (${r.balance} total)`;
+    earnCoins("doubledutch", { grade }).then((r) => {
+      if (r.ok) logEl.innerHTML += ` <br/>+${r.amount} 🪙 (${r.balance} total)`;
     });
     window.removeEventListener("keydown", onKey);
   }

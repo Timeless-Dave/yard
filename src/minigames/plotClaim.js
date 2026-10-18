@@ -2,6 +2,7 @@ import { collection, doc, getDoc, setDoc, deleteDoc, query, where, orderBy, getD
 import { db, ONLINE } from "../firebase.js";
 import { getState } from "../auth.js";
 import { unlockAchievement } from "../achievements.js";
+import { esc } from "../text.js";
 
 export function mountPlotClaim(root, { letters, onClose } = {}) {
   if (!letters) {
@@ -19,7 +20,7 @@ export function mountPlotClaim(root, { letters, onClose } = {}) {
     root.innerHTML = `
       <div class="modal">
         <h3>🏠 Claim ${letters} Plot</h3>
-        <p>Claim a Divine Nine plot house, join the membership roster, and sign up for Probate Night — the public stepping reveal for new members. Connect Firebase (see <code>firebase/README.md</code>) to turn this on.</p>
+        <p>Claim a Divine Nine plot house, join the membership roster, and sign up for Probate Night — the public stepping reveal for new members. Online play isn't switched on for this copy of The Yard yet.</p>
         <button class="btn btn-primary close" style="width:100%;">Close</button>
       </div>`;
     root.querySelector(".close").addEventListener("click", () => onClose?.());
@@ -65,7 +66,7 @@ export function mountPlotClaim(root, { letters, onClose } = {}) {
           try {
             await setDoc(doc(db, "plotClaims", letters), {
               userId: authState.user.uid,
-              displayName: authState.profile?.display_name || "Golden Lion",
+              displayName: getState().profile?.display_name || "Golden Lion",
               claimedAt: serverTimestamp(),
             });
             unlockAchievement("plot_owner");
@@ -106,7 +107,7 @@ export function mountPlotClaim(root, { letters, onClose } = {}) {
     members.forEach((m) => {
       const row = document.createElement("div");
       row.className = "lb-row";
-      row.innerHTML = `<span class="lb-rank">👤</span><span class="lb-name">${m.displayName}</span><span></span>`;
+      row.innerHTML = `<span class="lb-rank">👤</span><span class="lb-name">${esc(m.displayName)}</span><span></span>`;
       rosterEl.appendChild(row);
     });
 
@@ -125,6 +126,7 @@ export function mountPlotClaim(root, { letters, onClose } = {}) {
       joinBtn.onclick = async () => {
         await deleteDoc(doc(db, "orgMembers", authState.user.uid));
         refreshRoster();
+        refreshProbate();
       };
     } else if (myMembership) {
       joinBtn.textContent = `Already a member of ${myMembership.letters}`;
@@ -136,10 +138,11 @@ export function mountPlotClaim(root, { letters, onClose } = {}) {
         try {
           await setDoc(doc(db, "orgMembers", authState.user.uid), {
             letters,
-            displayName: authState.profile?.display_name || "Golden Lion",
+            displayName: getState().profile?.display_name || "Golden Lion",
             joinedAt: serverTimestamp(),
           });
           refreshRoster();
+          refreshProbate();
         } catch (e) {
           alert("Couldn't join: " + e.message);
         }
@@ -157,7 +160,7 @@ export function mountPlotClaim(root, { letters, onClose } = {}) {
     signups.forEach((s) => {
       const row = document.createElement("div");
       row.className = "lb-row";
-      row.innerHTML = `<span class="lb-rank">🎙️</span><span class="lb-name">${s.displayName}</span><span></span>`;
+      row.innerHTML = `<span class="lb-rank">🎙️</span><span class="lb-name">${esc(s.displayName)}</span><span></span>`;
       probateEl.appendChild(row);
     });
 
@@ -166,15 +169,21 @@ export function mountPlotClaim(root, { letters, onClose } = {}) {
       return;
     }
     const already = signups.some((s) => s.userId === authState.user.uid);
+    const membership = await getDoc(doc(db, "orgMembers", authState.user.uid));
+    const isMember = membership.exists() && membership.data().letters === letters;
     probateBtn.style.display = "block";
-    probateBtn.disabled = already;
-    probateBtn.textContent = already ? "You're signed up" : "Sign up for Probate Night";
+    probateBtn.disabled = already || !isMember;
+    probateBtn.textContent = already
+      ? "You're signed up"
+      : isMember
+        ? "Sign up for Probate Night"
+        : `Join ${letters} to sign up for Probate Night`;
     probateBtn.onclick = async () => {
       try {
         await setDoc(doc(db, "probateSignups", `${letters}_${authState.user.uid}`), {
           userId: authState.user.uid,
           letters,
-          displayName: authState.profile?.display_name || "Golden Lion",
+          displayName: getState().profile?.display_name || "Golden Lion",
           createdAt: serverTimestamp(),
         });
         refreshProbate();

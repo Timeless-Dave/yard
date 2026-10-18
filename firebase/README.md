@@ -37,14 +37,15 @@ corkboard, and Divine Nine plot claims, connect a free Firebase project:
    VITE_FIREBASE_DATABASE_URL=...   # the Realtime Database URL from step 5
    ```
 8. Restart the dev server (`npm run dev`). The topbar will show live player
-   count instead of the static placeholder, Sign up/Log in will work, and
+   count instead of "Solo mode", Sign up/Log in will work, and
    other signed-in players moving around will appear as other avatars.
-9. Deploy the Cloud Functions (coin economy + Stripe) — see
-   [Cloud Functions](#cloud-functions-coin-economy) below. Voting, parties,
-   plot claims, and the corkboard work without them; the **store** and
-   **vending machine** need `earnCoins`/`spendCoins`/`purchaseWithCoins`
-   deployed first.
-10. Seed the store catalog once:
+9. Deploy the Cloud Functions — see [Cloud Functions](#cloud-functions)
+   below. **Deploy these before inviting anyone:** they run the coin economy
+   and the server-side moderation checks. Without them, chat and the
+   corkboard still work, but only the in-browser filter checks posts, and a
+   modified client can skip that.
+10. Make yourself a moderator (see [Moderation](#moderation)).
+11. Seed the store catalog once:
     ```
     npm install
     GOOGLE_APPLICATION_CREDENTIALS=/path/to/serviceAccountKey.json npm run seed:store
@@ -52,24 +53,35 @@ corkboard, and Divine Nine plot claims, connect a free Firebase project:
     (Download a service account key from **Project Settings → Service
     accounts → Generate new private key** to get that JSON file.)
 
-## Cloud Functions (coin economy)
+## Cloud Functions
 
-The old "a client can never write its own coin balance" guarantee — enforced
-in Postgres by `SECURITY DEFINER` functions — is now enforced by Firestore
-rules that make `wallets`, `walletTransactions`, `inventory`, and
-`purchases` entirely unwritable by clients (`allow write: if false`), with
-every mutation going through `functions/index.js`'s callable functions using
-the Admin SDK, which bypasses those rules by design:
+Clients can never write coin balances, inventory, purchases, or the earn
+log: Firestore rules deny it outright (`allow write: if false`). Every change
+goes through `functions/index.js`, which uses the Admin SDK.
 
-- `earnCoins` — capped at 250 per call (same cap the old SQL function had).
-- `spendCoins` — checks balance server-side before deducting.
-- `purchaseWithCoins` — the coin-priced store flow: checks balance, applies
-  any `discountPct`, grants inventory + records the purchase atomically.
-- `createCheckoutSession` / `stripeWebhook` — the Stripe flow, see below.
-- `onVoteWrite` / `onRsvpWrite` — Firestore triggers that keep
-  `candidates.voteCount` and `parties.rsvpCount` in sync (Firestore has no
-  `GROUP BY`, so these replace the old `candidate_tallies`/`party_tallies`
-  SQL views).
+**Economy**
+- `earnCoins`: the client reports what happened (`source` plus a `grade` or
+  `achievementId`), and the server decides the payout from
+  `functions/gameRules.js`. It enforces per-source cooldowns, once-per-day
+  rewards (band cheer, Lions Den), once-ever achievement bonuses, and a
+  1,000-coin daily cap. The minigames themselves run in the browser, so the
+  server can't prove a round was really won. These limits cap what a cheater
+  can gain; they don't prevent cheating outright.
+- `spendCoins`: whole-number amounts up to 1,000, checked against the
+  balance.
+- `purchaseWithCoins`: checks the balance, applies any `discountPct`, and
+  grants the item and records the purchase in one transaction.
+- `createCheckoutSession` / `stripeWebhook`: the Stripe flow, see below.
+
+**Tallies**: `onVoteWrite` / `onRsvpWrite` keep `candidates.voteCount` and
+`parties.rsvpCount` in sync. Firestore has no `GROUP BY`, so these replace
+SQL views.
+
+**Moderation**: `moderateChat`, `moderateCorkboard`, `moderateCandidate`,
+`moderateParty`, `moderateProfile`, `onReportCreated`, `resolveReport`. See
+[Moderation](#moderation).
+
+**Privacy**: `deleteMyAccount` removes the account and everything it owns.
 
 Deploy all of them with:
 ```
@@ -95,7 +107,8 @@ secret key must never be shipped to the browser:
    ```
 3. In the Stripe dashboard, add a webhook endpoint pointing at the deployed
    `stripeWebhook` function's URL (shown after deploy), listening for
-   `checkout.session.completed`, then copy its signing secret:
+   `checkout.session.completed` and `checkout.session.async_payment_succeeded`,
+   then copy its signing secret:
    ```
    firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
    firebase deploy --only functions:stripeWebhook
@@ -108,7 +121,56 @@ yet" instead of failing silently — coin-priced items are unaffected.
 by this app's own code — Stripe Checkout is a Stripe-hosted page. No secret
 key is ever in client code. Coin grants from a real payment only happen
 inside `stripeWebhook`, authenticated by Stripe's signature, using the
-Admin SDK that only that server-side function holds.
+Admin SDK that only that server-side function holds. The webhook only grants
+sessions whose `payment_status` is `paid`, and grants each session exactly
+once. Stripe retries webhook deliveries, so the purchase record is keyed by
+session ID and checked inside the same transaction that grants.
+
+**What's tested and what isn't:** the webhook (signature checks, paid and
+unpaid sessions, retry replay, coin packs, and cosmetics) is covered by
+`npm run test:emulator`, using signed test events. Creating a real Checkout
+Session calls Stripe's API, so it needs your own Stripe test keys. Run one
+test-mode purchase end to end before taking real payments.
+
+## Moderation
+
+Every public text field (chat, corkboard, nominee names, party titles, and
+display names) goes through `functions/moderation.js`:
+
+1. **In the browser, before posting.** The player gets an instant reason
+   ("Links aren't allowed here", etc.).
+2. **On the server, after posting.** Triggers re-run the same check and hide
+   anything a modified client slipped past. Offensive display names are
+   reset to "Golden Lion".
+
+The filter blocks slurs, sexual content, strong profanity, self-harm
+harassment ("kys"), links, phone numbers, and emails. It catches spacing and
+leetspeak evasion ("f u c k", "n1gg3r") and is unit-tested against common
+false positives ("summa cum laude", "class assignment", "Niger", "shiitake").
+The word list is in one file; edit it to fit your community.
+
+On top of the filter:
+
+- **Rate limiting**: one public post every 3 seconds per player, enforced
+  by Firestore rules, not just the UI.
+- **Reports**: 🚩 on any message, post, nominee, or party. A player can
+  report each item once, and anything reported by **3 different players is
+  hidden immediately** until a moderator reviews it.
+- **Moderator queue**: moderators see 🛡️ Moderation queue in their account
+  menu, with Dismiss, Hide, Restore, and Hide + ban author. Bans block all
+  posting (enforced by rules). Every action is recorded in `modLog`.
+- **Hidden content is unreadable** to everyone except moderators (rules, not
+  just UI filtering).
+
+Make someone a moderator (they need to sign out and back in once):
+
+```
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/serviceAccountKey.json npm run set-admin -- you@example.com
+```
+
+Automated filtering never catches everything. Before inviting a real
+student community, have at least one active moderator, and decide how
+quickly reports will get reviewed.
 
 ## How identity works here
 
@@ -119,9 +181,14 @@ Admin SDK that only that server-side function holds.
     corkboard, and claim a plot.
   - **Email + password** — create an account or log in, with a "forgot
     password?" reset link.
-  - **Google** — one-tap sign-in with an existing Google account.
+  - **Google** — one-tap sign-in with an existing Google account. Only the
+    first name from the Google profile is used by default, since display
+    names are public.
 - A `users/{uid}` Firestore document is created on first sign-in holding
-  just a display name and a cosmetic color.
+  just a display name and a cosmetic color. Players can rename themselves
+  and delete their account (and everything they've posted) from the account
+  menu.
+- Homecoming ballots are private. Only per-nominee totals are public.
 - Position/rotation are **not** persisted anywhere — they're only broadcast
   live over a Realtime Database `presence/{uid}` node while you're on the
   page, and automatically removed (`onDisconnect`) if your tab closes or

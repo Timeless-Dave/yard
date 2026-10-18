@@ -21,3 +21,7 @@ export function getActiveSeason(date = new Date()) {
 export function isHalloween(date = new Date()) {
   return getActiveSeason(date)?.id === "halloween";
 }
+
+// Weekly, not a date range — and in campus time, so a player in another
+// timezone sees the same Wednesday the server pays out on.
+export { isCampusWednesday as isPrettyWednesday } from "../functions/gameRules.js";

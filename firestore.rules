@@ -3,27 +3,114 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ---- helpers ----
+    function signedIn() { return request.auth != null; }
+    function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
+    function isAdmin() { return signedIn() && request.auth.token.admin == true; }
+    function data() { return request.resource.data; }
+    function exactKeys(keys) { return data().keys().hasOnly(keys) && data().keys().hasAll(keys); }
+    function text(v, max) { return v is string && v.size() > 0 && v.size() <= max; }
+    function notBanned() { return !exists(/databases/$(database)/documents/bannedUsers/$(request.auth.uid)); }
+    function myName() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.display_name; }
+    function isPlotLetters(l) { return l in ['ΑΦΑ', 'ΔΣΘ', 'ΚΑΨ', 'ΟΦΒ', 'ΖΦΒ']; }
+
+    // Public posts must be written in the same batch as a bump to the
+    // author's rateLimits doc, which itself can only move forward 3s at a time.
+    function throttled() {
+      return getAfter(/databases/$(database)/documents/rateLimits/$(request.auth.uid)).data.lastPostAt == request.time;
+    }
+    // Shared shape for moderated, reportable, rate-limited public content.
+    function newPublicPost() {
+      return signedIn() && notBanned()
+        && data().createdAt == request.time
+        && data().hidden == false
+        && data().reportCount == 0
+        && throttled();
+    }
+    // Hidden content (auto-moderated, 3+ reports, or moderator action) is
+    // unreadable except by moderators. Queries must filter hidden == false.
+    function visible() { return resource.data.hidden == false || isAdmin(); }
+
     // ---- profiles ----
+    // Avatar color is either the default or the color of a cosmetic the
+    // player actually owns, so paid cosmetics can't be equipped for free.
+    function validProfile() {
+      return data().keys().hasOnly(['display_name', 'color', 'equippedItem', 'created_at'])
+        && text(data().display_name, 24)
+        && (
+          (data().color == '#f4b223' && data().get('equippedItem', null) == null)
+          || (data().equippedItem is string
+              && exists(/databases/$(database)/documents/inventory/$(request.auth.uid)/items/$(data().equippedItem))
+              && get(/databases/$(database)/documents/storeItems/$(data().equippedItem)).data.meta.color == data().color)
+        );
+    }
     match /users/{uid} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == uid;
+      allow create: if isSelf(uid) && validProfile() && data().created_at == request.time;
+      allow update: if isSelf(uid) && validProfile() && data().created_at == resource.data.created_at;
     }
 
-    // ---- corkboard ----
+    match /rateLimits/{uid} {
+      allow read: if isSelf(uid);
+      allow create: if isSelf(uid) && exactKeys(['lastPostAt']) && data().lastPostAt == request.time;
+      allow update: if isSelf(uid) && exactKeys(['lastPostAt'])
+        && data().lastPostAt == request.time
+        && request.time > resource.data.lastPostAt + duration.value(3, 's');
+    }
+
+    match /bannedUsers/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+      allow write: if false;
+    }
+
+    // ---- public chat + corkboard ----
+    match /chatMessages/{messageId} {
+      allow read: if visible();
+      allow create: if newPublicPost()
+        && exactKeys(['userId', 'name', 'msg', 'createdAt', 'hidden', 'reportCount'])
+        && data().userId == request.auth.uid
+        && data().name == myName()
+        && text(data().msg, 200);
+    }
+
     match /corkboardPosts/{postId} {
-      allow read: if true;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-      allow update, delete: if false;
+      allow read: if visible();
+      allow create: if newPublicPost()
+        && exactKeys(['userId', 'name', 'type', 'msg', 'createdAt', 'hidden', 'reportCount'])
+        && data().userId == request.auth.uid
+        && data().name == myName()
+        && data().type in ['song', 'game', 'promo']
+        && text(data().msg, 140);
+    }
+
+    // ---- reports: one per reporter per target ----
+    match /reports/{reportId} {
+      allow create: if signedIn() && notBanned()
+        && exactKeys(['targetCollection', 'targetId', 'reporterId', 'reason', 'createdAt'])
+        && data().reporterId == request.auth.uid
+        && data().targetCollection in ['chatMessages', 'corkboardPosts', 'candidates', 'parties']
+        && data().targetId is string
+        && data().reason in ['harassment', 'hate', 'spam', 'sexual', 'impersonation', 'other']
+        && data().createdAt == request.time
+        && reportId == data().targetCollection + '_' + data().targetId + '_' + request.auth.uid
+        && exists(/databases/$(database)/documents/$(data().targetCollection)/$(data().targetId));
+      allow read: if isAdmin();
+    }
+
+    match /modLog/{entryId} {
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     // ---- Divine Nine plot claims ----
     match /plotClaims/{letters} {
       allow read: if true;
-      allow create: if request.auth != null
-        && request.auth.uid == request.resource.data.userId
-        && !exists(/databases/$(database)/documents/plotClaims/$(letters));
-      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow update: if false;
+      allow create: if signedIn() && notBanned() && isPlotLetters(letters)
+        && exactKeys(['userId', 'displayName', 'claimedAt'])
+        && data().userId == request.auth.uid
+        && data().displayName == myName()
+        && data().claimedAt == request.time;
+      allow delete: if signedIn() && request.auth.uid == resource.data.userId;
     }
 
     // ---- coin economy: client-unwritable, Cloud Functions (Admin SDK) only ----
@@ -31,16 +118,20 @@ service cloud.firestore {
       allow read: if true; // leaderboard needs public read of balances/names
       allow write: if false;
     }
+    match /earnLog/{uid} {
+      allow read: if isSelf(uid);
+      allow write: if false;
+    }
     match /walletTransactions/{uid}/entries/{entryId} {
-      allow read: if request.auth != null && request.auth.uid == uid;
+      allow read: if isSelf(uid);
       allow write: if false;
     }
     match /inventory/{uid}/items/{itemId} {
-      allow read: if request.auth != null && request.auth.uid == uid;
+      allow read: if isSelf(uid);
       allow write: if false;
     }
     match /purchases/{purchaseId} {
-      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow read: if signedIn() && request.auth.uid == resource.data.userId;
       allow write: if false;
     }
 
@@ -52,62 +143,87 @@ service cloud.firestore {
 
     // ---- Homecoming King/Queen voting ----
     match /candidates/{candidateId} {
-      allow read: if true;
-      allow create: if request.auth != null
-        && request.auth.uid == request.resource.data.nominatedBy
-        && request.resource.data.voteCount == 0;
+      allow read: if visible();
+      allow create: if newPublicPost()
+        && exactKeys(['category', 'name', 'nominatedBy', 'voteCount', 'createdAt', 'hidden', 'reportCount'])
+        && data().nominatedBy == request.auth.uid
+        && data().category in ['king', 'queen']
+        && text(data().name, 30)
+        && data().voteCount == 0;
       // voteCount only ever changes via the onVoteWrite Cloud Function trigger.
-      allow update, delete: if false;
     }
+    // Ballots are private: tallies live on candidates.voteCount, so nobody
+    // needs to read anyone else's vote.
     match /votes/{voteId} {
-      allow read: if true;
-      allow create, update: if request.auth != null
-        && request.auth.uid == request.resource.data.userId
-        && voteId == request.auth.uid + '_' + request.resource.data.category;
-      allow delete: if false;
+      allow read: if signedIn() && (voteId == request.auth.uid + '_king' || voteId == request.auth.uid + '_queen');
+      allow create, update: if signedIn() && notBanned()
+        && exactKeys(['userId', 'category', 'candidateId', 'createdAt'])
+        && data().userId == request.auth.uid
+        && voteId == request.auth.uid + '_' + data().category
+        && data().createdAt == request.time
+        && get(/databases/$(database)/documents/candidates/$(data().candidateId)).data.category == data().category
+        && get(/databases/$(database)/documents/candidates/$(data().candidateId)).data.hidden == false;
     }
 
     // ---- org membership + Probate Night ----
     match /orgMembers/{uid} {
       allow read: if true;
-      allow create: if request.auth != null && request.auth.uid == uid;
-      allow delete: if request.auth != null && request.auth.uid == uid;
-      allow update: if false;
+      allow create: if isSelf(uid) && notBanned()
+        && exactKeys(['letters', 'displayName', 'joinedAt'])
+        && isPlotLetters(data().letters)
+        && data().displayName == myName()
+        && data().joinedAt == request.time;
+      allow delete: if isSelf(uid);
     }
     match /probateSignups/{signupId} {
       allow read: if true;
-      allow create: if request.auth != null
-        && request.auth.uid == request.resource.data.userId
-        && signupId == request.resource.data.letters + '_' + request.auth.uid;
-      allow update, delete: if false;
+      allow create: if signedIn() && notBanned()
+        && exactKeys(['userId', 'letters', 'displayName', 'createdAt'])
+        && data().userId == request.auth.uid
+        && signupId == data().letters + '_' + request.auth.uid
+        && data().displayName == myName()
+        && data().createdAt == request.time
+        && get(/databases/$(database)/documents/orgMembers/$(request.auth.uid)).data.letters == data().letters;
     }
 
     // ---- kickbacks / parties ----
     match /parties/{partyId} {
-      allow read: if true;
-      allow create: if request.auth != null
-        && request.auth.uid == request.resource.data.hostId
-        && request.resource.data.rsvpCount == 0;
-      allow delete: if request.auth != null && request.auth.uid == resource.data.hostId;
+      allow read: if visible();
+      allow create: if newPublicPost()
+        && exactKeys(['hostId', 'hostName', 'title', 'vibe', 'spot', 'startsAt', 'endsAt', 'rsvpCount', 'createdAt', 'hidden', 'reportCount'])
+        && data().hostId == request.auth.uid
+        && data().hostName == myName()
+        && text(data().title, 40)
+        && data().vibe in ['kickback', 'block_party', 'after_party']
+        && text(data().spot, 40)
+        && data().startsAt is timestamp && data().endsAt is timestamp
+        && data().startsAt >= request.time - duration.value(5, 'm')
+        && data().startsAt <= request.time + duration.value(2, 'd')
+        && data().endsAt > data().startsAt
+        && data().endsAt <= data().startsAt + duration.value(4, 'h')
+        && data().rsvpCount == 0;
+      allow delete: if signedIn() && request.auth.uid == resource.data.hostId;
       // rsvpCount only ever changes via the onRsvpWrite Cloud Function trigger.
-      allow update: if false;
     }
     match /partyRsvps/{rsvpId} {
       allow read: if true;
       // create and update both allowed: setDoc() on an already-RSVP'd party
-      // (e.g. a repeat click) is a Firestore "update", not a "create" —
-      // this keeps that idempotent, matching the old upsert behavior.
-      allow create, update: if request.auth != null
-        && request.auth.uid == request.resource.data.userId
-        && rsvpId == request.resource.data.partyId + '_' + request.auth.uid;
-      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+      // (a repeat click) is a Firestore "update" — keeps it idempotent.
+      allow create, update: if signedIn() && notBanned()
+        && exactKeys(['partyId', 'userId', 'displayName', 'createdAt'])
+        && data().userId == request.auth.uid
+        && rsvpId == data().partyId + '_' + request.auth.uid
+        && data().displayName == myName()
+        && data().createdAt == request.time
+        && exists(/databases/$(database)/documents/parties/$(data().partyId));
+      allow delete: if signedIn() && request.auth.uid == resource.data.userId;
     }
 
-    // ---- achievements: non-monetary, client-writable like before ----
+    // ---- achievements: non-monetary, client-writable (coins for them are
+    // paid once per achievement by earnCoins, server-side) ----
     match /achievementProgress/{uid}/unlocked/{achievementId} {
       allow read: if true;
-      allow create: if request.auth != null && request.auth.uid == uid;
-      allow update, delete: if false;
+      allow create: if isSelf(uid) && exactKeys(['earnedAt']) && data().earnedAt == request.time;
     }
   }
 }

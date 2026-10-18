@@ -16,13 +16,13 @@
     <meta property="og:type" content="website" />
     <meta property="og:title" content="The Yard — UAPB Homecoming" />
     <meta property="og:description" content="Walk the real UAPB campus, play nostalgia minigames, and hang out with other Golden Lions." />
-    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:image" content="__SITE_URL__og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="The Yard — UAPB Homecoming" />
     <meta name="twitter:description" content="Walk the real UAPB campus, play nostalgia minigames, and hang out with other Golden Lions." />
-    <meta name="twitter:image" content="/og-image.png" />
+    <meta name="twitter:image" content="__SITE_URL__og-image.png" />
     <style>
       :root {
         --gold: #f4b223;
@@ -65,7 +65,8 @@
       .btn-secondary { background: #fff; color: var(--black); }
 
       .announce {
-        position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
+        /* Bottom-anchored: at desktop widths the chip rows fill the top of the screen. */
+        position: absolute; bottom: 132px; left: 50%; transform: translateX(-50%);
         background: var(--panel-bg); color: #fff; padding: 6px 16px; border-radius: 999px;
         font-size: 13px; border: 1px solid rgba(244,178,35,0.4); white-space: nowrap;
         max-width: 90vw; overflow: hidden; text-overflow: ellipsis;
@@ -240,8 +241,10 @@
       .peer-tag {
         position: absolute; background: rgba(18,18,18,0.8); color: #fff; font-size: 11px;
         font-weight: 700; padding: 2px 8px; border-radius: 999px; transform: translate(-50%, -100%);
-        pointer-events: none; white-space: nowrap;
+        pointer-events: none; white-space: nowrap; z-index: 1;
       }
+      /* Other players' name tags float over the 3D scene, never over the controls. */
+      .topbar, .bottom-card { z-index: 2; }
 
       .minimap {
         position: absolute; top: 118px; right: 12px; width: 150px; height: 150px;
@@ -302,9 +305,28 @@
       }
       .touch-btn:active { background: var(--gold); color: var(--black); }
 
+      /* ---- Reporting + guidelines ---- */
+      .report-wrap { margin-left: 8px; font-size: 11px; opacity: 0.85; }
+      .report-btn {
+        background: none; border: none; cursor: pointer; font-size: 12px;
+        padding: 0 2px; opacity: 0.45; vertical-align: middle;
+      }
+      .report-btn:hover, .report-btn:focus-visible { opacity: 1; }
+      .report-menu { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 6px; vertical-align: middle; }
+      .report-reason {
+        background: #2a2a2a; border: 1px solid rgba(255,255,255,0.2); color: #fff;
+        border-radius: 999px; font-size: 11px; padding: 2px 8px; cursor: pointer;
+      }
+      .report-reason:hover { border-color: var(--gold); }
+      .guidelines-list { padding-left: 18px; margin: 6px 0; font-size: 13px; line-height: 1.5; }
+      .guidelines-link, #am-delete { color: var(--gold); }
+      #am-delete { color: #e66; }
+
       /* ---- Responsive layout ---- */
       @media (max-width: 900px) {
-        .topbar { flex-direction: column; align-items: stretch; top: 8px; left: 8px; right: 8px; }
+        /* nowrap: a wrapping column flexbox sizes each line to its widest
+           content (the full chip row), pushing everything off-screen. */
+        .topbar { flex-direction: column; flex-wrap: nowrap; align-items: stretch; top: 8px; left: 8px; right: 8px; }
         .topbar > div:first-child { display: flex; justify-content: space-between; }
         .chip-row {
           flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
@@ -312,6 +334,8 @@
         }
         .chip { padding: 7px 11px; font-size: 12px; }
         .auth-row { justify-content: flex-end; }
+        /* The bottom card already has Sign up / Log in on phones; keep only the coin badge up top. */
+        .topbar .auth-row .btn { display: none; }
         .announce { display: none; }
         .hint { display: none; }
         .bottom-card {
@@ -323,7 +347,7 @@
         .interact-prompt { bottom: 210px; font-size: 12px; padding: 7px 12px; }
         .modal, .game-modal { padding: 16px; max-height: 80vh; overflow-y: auto; }
         .store-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
-        .minimap { width: 84px; height: 84px; top: 160px; right: 8px; }
+        .minimap { width: 84px; height: 84px; top: 212px; right: 8px; }
       }
 
       @media (max-width: 900px), (pointer: coarse) {
@@ -355,6 +379,7 @@
           <div class="chip" data-modal="pager">📟 Page Somebody</div>
           <div class="chip" data-modal="cookout">🔥 Cookout</div>
           <div class="chip" data-modal="community">📌 Corkboard</div>
+          <div class="chip" data-modal="chat">💬 Yard Chat</div>
           <div class="chip" data-modal="leaderboard">🏅 Leaderboard</div>
           <div class="chip" data-modal="store">🛍️ Store</div>
           <div class="chip" data-modal="parties">🎉 Parties</div>
@@ -371,7 +396,7 @@
         </div>
       </div>
 
-      <div class="announce" id="announce-banner">📣 <b>@GoldenLion_23</b>: first one to The Yard for the step show gets the plug 🕺</div>
+      <div class="announce" id="announce-banner">📣 <b>The Yard</b>: first one to the step show stage gets the plug 🕺</div>
 
       <div class="hint">
         <b>WASD / Arrows</b> or a <b>controller</b> to walk the Yard<br/>
@@ -381,7 +406,7 @@
       <canvas class="minimap" id="minimap" width="160" height="160"></canvas>
 
       <div class="bottom-card">
-        <div class="label" id="player-count-label"><b>2,847</b> on the Yard · free</div>
+        <div class="label" id="player-count-label"><b>Solo mode</b> · free</div>
         <button class="btn btn-primary" data-modal="auth">Sign up free</button>
         <button class="btn btn-secondary" data-modal="auth">Log in</button>
       </div>

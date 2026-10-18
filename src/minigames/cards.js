@@ -151,8 +151,8 @@ export function mountCardGame(root, { onClose } = {}) {
         unlockAchievement("card_shark");
       } else if (!tie) playFail();
       if (win) {
-        earnCoins(15, "spades win").then((r) => {
-          if (r.ok) logEl.textContent += ` +15 🪙 (${r.balance} total)`;
+        earnCoins("spades_win").then((r) => {
+          if (r.ok) logEl.textContent += ` +${r.amount} 🪙 (${r.balance} total)`;
         });
       }
       handEl.innerHTML = "";

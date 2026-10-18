@@ -16,7 +16,7 @@ export function mountVending(root, { onClose } = {}) {
   root.innerHTML = `
     <div class="modal game-modal">
       <h3>🥤 Vending Machine</h3>
-      <p class="corkboard-sub">${ONLINE ? `Balance: <b>🪙 ${getBalance()}</b>` : "Connect Firebase to spend real Yard Coin here — this one's just for show right now."}</p>
+      <p class="corkboard-sub">${ONLINE ? `Balance: <b>🪙 ${getBalance()}</b>` : "Sign in online to spend Yard Coin here — this one's just for show right now."}</p>
       <div class="store-grid" id="vend-grid"></div>
       <div class="game-log" id="vend-log"></div>
       <button class="btn btn-secondary close" style="margin-top:12px;width:100%;">Walk away</button>
@@ -36,7 +36,7 @@ export function mountVending(root, { onClose } = {}) {
       <button class="btn btn-primary">Buy</button>`;
     card.querySelector("button").addEventListener("click", async () => {
       if (!ONLINE) {
-        logEl.textContent = "Connect Firebase to actually buy something here.";
+        logEl.textContent = "Online play isn't switched on for this copy of The Yard yet.";
         return;
       }
       const r = await spendCoins(snack.price, "vending: " + snack.name);

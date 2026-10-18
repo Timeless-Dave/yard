@@ -1,11 +1,10 @@
 import { collection, doc, getDocs, setDoc, serverTimestamp } from "firebase/firestore";
 import { db, ONLINE } from "./firebase.js";
-import { getState } from "./auth.js";
+import { getState, onAuthChange } from "./auth.js";
 import { earnCoins } from "./economy.js";
 import { playSuccess } from "./sound.js";
 
 const STORAGE_KEY = "yard-achievements-v1";
-const BONUS_COINS = 25;
 
 export const ACHIEVEMENTS = [
   { id: "first_steps", icon: "👟", name: "First Steps", desc: "Walk the Yard" },
@@ -26,6 +25,8 @@ export const ACHIEVEMENTS = [
   { id: "rope_champ", icon: "🪢", name: "Rope Champ", desc: "S grade in Double Dutch" },
   { id: "hopscotch_champ", icon: "🩴", name: "Hopscotch Champ", desc: "S grade in Hopscotch" },
   { id: "dj_yard", icon: "📻", name: "DJ on the Yard", desc: "Turn on the boombox" },
+  { id: "yard_talk", icon: "💬", name: "Yard Talk", desc: "Send a message in Yard Chat" },
+  { id: "pretty_wednesday", icon: "✨", name: "Pretty Wednesday", desc: "Pull up to the Lions Den on a Wednesday" },
 ];
 
 function loadLocal() {
@@ -59,15 +60,40 @@ export function getUnlocked() {
   return unlocked;
 }
 
-async function syncFromServer() {
-  const { user } = getState();
-  if (!ONLINE || !user) return;
+// Records an unlock server-side and claims its one-time coin bonus (the
+// server refuses a second claim, so retrying is harmless).
+async function recordOnServer(user, id) {
+  try {
+    await setDoc(doc(db, "achievementProgress", user.uid, "unlocked", id), { earnedAt: serverTimestamp() });
+  } catch {
+    /* already recorded — rules only allow the first write */
+  }
+  await earnCoins("achievement", { achievementId: id });
+}
+
+// Two-way sync on sign-in: pull what the server knows, then push anything
+// unlocked while offline or signed out.
+async function syncWithServer(user) {
   const snap = await getDocs(collection(db, "achievementProgress", user.uid, "unlocked"));
-  snap.forEach((d) => unlocked.add(d.id));
+  const onServer = new Set(snap.docs.map((d) => d.id));
+  onServer.forEach((id) => unlocked.add(id));
   saveLocal(unlocked);
   emit();
+  for (const id of unlocked) {
+    if (!onServer.has(id) && ACHIEVEMENTS.some((a) => a.id === id)) await recordOnServer(user, id);
+  }
 }
-syncFromServer();
+
+let syncedUid = null;
+if (ONLINE) {
+  onAuthChange(({ user }) => {
+    if (user && user.uid !== syncedUid) {
+      syncedUid = user.uid;
+      syncWithServer(user).catch((e) => console.warn("[The Yard] achievement sync failed:", e.message));
+    }
+    if (!user) syncedUid = null;
+  });
+}
 
 let toastEl = null;
 function showToast(achievement) {
@@ -95,8 +121,5 @@ export async function unlockAchievement(id) {
   showToast(achievement);
 
   const { user } = getState();
-  if (ONLINE && user) {
-    await setDoc(doc(db, "achievementProgress", user.uid, "unlocked", id), { earnedAt: serverTimestamp() });
-    earnCoins(BONUS_COINS, "achievement: " + achievement.name);
-  }
+  if (ONLINE && user) await recordOnServer(user, id);
 }

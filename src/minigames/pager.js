@@ -2,7 +2,6 @@ import { earnCoins } from "../economy.js";
 import { playSuccess, playFail } from "../sound.js";
 import { unlockAchievement } from "../achievements.js";
 
-const GRADE_COINS = { S: 100, A: 70, B: 40, C: 15 };
 const CODES = [
   { code: "143", phrase: "I love you" },
   { code: "07734", phrase: "HELLO (read it upside down)" },
@@ -121,10 +120,8 @@ export function mountPager(root, { onClose } = {}) {
     again.textContent = "Page again";
     again.addEventListener("click", () => mountPager(root, { onClose }));
     root.querySelector(".game-modal").insertBefore(again, root.querySelector(".close"));
-
-    const coins = GRADE_COINS[grade];
-    earnCoins(coins, "pager grade " + grade).then((r) => {
-      if (r.ok) logEl.innerHTML += ` <br/>+${coins} 🪙 (${r.balance} total)`;
+    earnCoins("pager", { grade }).then((r) => {
+      if (r.ok) logEl.innerHTML += ` <br/>+${r.amount} 🪙 (${r.balance} total)`;
     });
   }
 

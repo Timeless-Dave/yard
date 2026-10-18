@@ -177,8 +177,8 @@ export function mountDominoes(root, { onClose } = {}) {
       won ? playSuccess() : playFail();
       if (won) unlockAchievement("domino_king");
       if (won) {
-        earnCoins(20, "dominoes win").then((r) => {
-          if (r.ok) logEl.textContent += ` +20 🪙 (${r.balance} total)`;
+        earnCoins("dominoes_win").then((r) => {
+          if (r.ok) logEl.textContent += ` +${r.amount} 🪙 (${r.balance} total)`;
         });
       }
       return true;
@@ -201,8 +201,8 @@ export function mountDominoes(root, { onClose } = {}) {
     if (pSum !== aSum) won ? playSuccess() : playFail();
     if (won) unlockAchievement("domino_king");
     if (won) {
-      earnCoins(12, "dominoes blocked win").then((r) => {
-        if (r.ok) logEl.textContent += ` +12 🪙 (${r.balance} total)`;
+      earnCoins("dominoes_blocked_win").then((r) => {
+        if (r.ok) logEl.textContent += ` +${r.amount} 🪙 (${r.balance} total)`;
       });
     }
   }

@@ -1,7 +1,7 @@
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions, ONLINE } from "../firebase.js";
-import { getState, setAvatarColor } from "../auth.js";
+import { getState, equipItem } from "../auth.js";
 import { getBalance } from "../economy.js";
 import { getActiveSeason } from "../seasonal.js";
 import { unlockAchievement } from "../achievements.js";
@@ -11,7 +11,7 @@ export function mountStore(root, { onClose } = {}) {
     root.innerHTML = `
       <div class="modal">
         <h3>🛍️ The Yard Store</h3>
-        <p>Cosmetics bought with Yard Coin, plus coin packs via Stripe Checkout (server-side — no card details ever touch this app directly). Connect Firebase (see <code>firebase/README.md</code>) to turn this on.</p>
+        <p>Cosmetics bought with Yard Coin, plus coin packs via Stripe Checkout (server-side — no card details ever touch this app directly). Online play isn't switched on for this copy of The Yard yet.</p>
         <button class="btn btn-primary close" style="width:100%;">Close</button>
       </div>`;
     root.querySelector(".close").addEventListener("click", () => onClose?.());
@@ -91,7 +91,7 @@ export function mountStore(root, { onClose } = {}) {
 
   async function equip(item) {
     if (!item.meta?.color) return;
-    await setAvatarColor(item.meta.color);
+    await equipItem(item);
     unlockAchievement("fresh_fit");
     render();
   }
@@ -105,7 +105,7 @@ export function mountStore(root, { onClose } = {}) {
       try {
         const { data } = await httpsCallable(functions, "purchaseWithCoins")({ itemId: item.id });
         root.querySelector("#store-balance").textContent = `🪙 ${data.balance}`;
-        if (item.kind === "cosmetic" && item.meta?.color) await setAvatarColor(item.meta.color);
+        if (item.kind === "cosmetic" && item.meta?.color) await equipItem(item);
         unlockAchievement("shopper");
         render();
       } catch (e) {
@@ -122,7 +122,7 @@ export function mountStore(root, { onClose } = {}) {
       if (!data?.url) throw new Error("no checkout url");
       window.location.href = data.url;
     } catch {
-      alert("Payments aren't set up yet on this deployment — see firebase/README.md to turn on Stripe.");
+      alert("Payments aren't set up yet on this deployment — check back soon.");
     }
   }
 

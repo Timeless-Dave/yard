@@ -1,14 +1,16 @@
-import { collection, doc, addDoc, getDoc, setDoc, query, where, orderBy, onSnapshot, serverTimestamp } from "firebase/firestore";
+import { collection, doc, getDoc, setDoc, query, where, orderBy, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { db, ONLINE } from "../firebase.js";
 import { getState } from "../auth.js";
 import { unlockAchievement } from "../achievements.js";
+import { moderateText, MAX_LENGTHS, publishPost, reportControl } from "../safety.js";
+import { esc } from "../text.js";
 
 export function mountVoting(root, { onClose } = {}) {
   if (!ONLINE) {
     root.innerHTML = `
       <div class="modal">
-        <h3>🏆 Vote: Mr. / Miss UAPB Homecoming</h3>
-        <p>Nominate and vote for this year's Homecoming King & Queen — one vote per category, change it any time before the polls close. Connect Firebase (see <code>firebase/README.md</code>) to turn this on.</p>
+        <h3>🏆 Vote: Homecoming Court</h3>
+        <p>Nominate and vote for this year's Homecoming King & Queen — one vote per category, change it any time. Online play isn't switched on for this copy of The Yard yet.</p>
         <button class="btn btn-primary close" style="width:100%;">Close</button>
       </div>`;
     root.querySelector(".close").addEventListener("click", () => onClose?.());
@@ -28,14 +30,16 @@ export function mountVoting(root, { onClose } = {}) {
       </div>
       <div class="leaderboard-list" id="vote-list">Loading...</div>
       <div class="corkboard-form" style="margin-top:10px;">
-        <input id="vote-nominee" type="text" maxlength="30" placeholder="Nominate someone new" />
+        <input id="vote-nominee" type="text" maxlength="${MAX_LENGTHS.nominee}" placeholder="Nominate someone new" />
         <button class="btn btn-primary" id="vote-nominate" style="width:100%;">Add nominee</button>
+        <div class="auth-status" id="vote-status"></div>
       </div>
       <button class="btn btn-secondary close" style="margin-top:12px;width:100%;">Close</button>
     </div>`;
 
   const listEl = root.querySelector("#vote-list");
   const nomineeInput = root.querySelector("#vote-nominee");
+  const statusEl = root.querySelector("#vote-status");
 
   async function myVote() {
     if (!authState.user) return null;
@@ -53,14 +57,15 @@ export function mountVoting(root, { onClose } = {}) {
       const row = document.createElement("div");
       row.className = "lb-row" + (c.id === mine ? " lb-me" : "");
       row.innerHTML = `
-        <span class="lb-rank">${c.voteCount || 0}</span>
-        <span class="lb-name">${c.name}</span>
+        <span class="lb-rank">${Number(c.voteCount) || 0}</span>
+        <span class="lb-name">${esc(c.name)}</span>
         <button class="btn ${c.id === mine ? "btn-primary" : "btn-secondary"}" style="padding:6px 12px;font-size:12px;">
           ${c.id === mine ? "Your vote" : "Vote"}
         </button>`;
-      row.querySelector("button").addEventListener("click", async () => {
+      row.querySelector(".lb-name").appendChild(reportControl("candidates", c.id));
+      row.querySelector("button.btn").addEventListener("click", async () => {
         if (!authState.user) {
-          alert("Join the Yard first (Sign up / Log in) to vote.");
+          statusEl.textContent = "Join the Yard first (Sign up / Log in) to vote.";
           return;
         }
         try {
@@ -71,8 +76,9 @@ export function mountVoting(root, { onClose } = {}) {
             createdAt: serverTimestamp(),
           });
           unlockAchievement("voter");
+          renderRows(candidates, c.id);
         } catch (e) {
-          alert("Couldn't vote: " + e.message);
+          statusEl.textContent = "Couldn't vote: " + e.message;
         }
       });
       listEl.appendChild(row);
@@ -80,14 +86,19 @@ export function mountVoting(root, { onClose } = {}) {
   }
 
   function watch() {
-    if (unsubscribe) unsubscribe();
+    unsubscribe?.();
     listEl.innerHTML = "Loading...";
-    const q = query(collection(db, "candidates"), where("category", "==", category), orderBy("voteCount", "desc"));
-    unsubscribe = onSnapshot(q, async (snap) => {
-      const candidates = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      const mine = await myVote();
-      renderRows(candidates, mine);
-    });
+    const q = query(
+      collection(db, "candidates"),
+      where("category", "==", category),
+      where("hidden", "==", false),
+      orderBy("voteCount", "desc")
+    );
+    unsubscribe = onSnapshot(
+      q,
+      async (snap) => renderRows(snap.docs.map((d) => ({ id: d.id, ...d.data() })), await myVote()),
+      (e) => (listEl.textContent = "Couldn't load nominees: " + e.message)
+    );
   }
 
   root.querySelectorAll(".auth-tab").forEach((tab) => {
@@ -100,30 +111,26 @@ export function mountVoting(root, { onClose } = {}) {
   });
 
   root.querySelector("#vote-nominate").addEventListener("click", async () => {
-    const name = nomineeInput.value.trim();
-    if (!name) return;
-    if (!authState.user) {
-      alert("Join the Yard first (Sign up / Log in) to nominate someone.");
+    const checked = moderateText(nomineeInput.value, { maxLength: MAX_LENGTHS.nominee });
+    if (!checked.ok) {
+      statusEl.textContent = checked.reason;
       return;
     }
-    try {
-      await addDoc(collection(db, "candidates"), {
-        category,
-        name,
-        nominatedBy: authState.user.uid,
-        voteCount: 0,
-        createdAt: serverTimestamp(),
-      });
-      nomineeInput.value = "";
-    } catch (e) {
-      alert("Couldn't nominate: " + e.message);
+    const result = await publishPost(doc(collection(db, "candidates")), {
+      category,
+      name: checked.text,
+      nominatedBy: authState.user?.uid,
+      voteCount: 0,
+    });
+    if (!result.ok) {
+      statusEl.textContent = result.error;
+      return;
     }
+    statusEl.textContent = "";
+    nomineeInput.value = "";
   });
 
-  root.querySelector(".close").addEventListener("click", () => {
-    if (unsubscribe) unsubscribe();
-    onClose?.();
-  });
-
+  root.querySelector(".close").addEventListener("click", () => onClose?.());
   watch();
+  return () => unsubscribe?.();
 }
