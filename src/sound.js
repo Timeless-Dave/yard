@@ -61,6 +61,13 @@ export function playFail() {
   tone(300, { duration: 0.3, type: "sawtooth", slideTo: 110, gain: 0.12 });
 }
 
+export function playDrumline() {
+  // snare-ish hits + a brass stab, roughly drumline-and-horns flavored
+  [0, 0.12, 0.24, 0.3, 0.42].forEach((d) => tone(180, { duration: 0.05, delay: d, type: "square", gain: 0.1 }));
+  tone(330, { duration: 0.35, delay: 0.42, type: "sawtooth", gain: 0.14 });
+  tone(440, { duration: 0.35, delay: 0.42, type: "sawtooth", gain: 0.1 });
+}
+
 export function playNotify() {
   tone(740, { duration: 0.1, type: "sine" });
   tone(740, { duration: 0.1, delay: 0.14, type: "sine" });

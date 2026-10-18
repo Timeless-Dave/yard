@@ -18,6 +18,8 @@ import { getActiveCampus, setActiveCampusId, CAMPUSES } from "./campuses.js";
 import { createBellTower, createAcademicHall, createModernHall, createDormHall, createStadiumComplex, createStudentUnion, createLibrary, createGymComplex, createFineArtsCenter, createSTEMBuilding, createCaldwellHall } from "./buildings.js";
 import { createRoadNetwork, createTraffic } from "./traffic.js";
 import { createPedestrians } from "./pedestrians.js";
+import { createMarchingBand } from "./band.js";
+import { mountBand } from "./minigames/band.js";
 import { initMinimap } from "./minimap.js";
 import { playOpen, playClose, playClick, isMuted, toggleMuted } from "./sound.js";
 import { mountAchievements } from "./minigames/achievements.js";
@@ -434,6 +436,18 @@ RETAIL_NEAR_UNION.forEach((r) => {
 });
 
 const interactionZones = [];
+
+// M4 — the Marching Musical Machine of the Mid-South — runs drill on the
+// stadium approach. Only UAPB has a stadium special-tagged, so this is
+// UAPB-only until another campus gets its own band treatment.
+let band = null;
+const stadiumBuilding = BUILDINGS.find((b) => b.special === "stadium");
+if (stadiumBuilding) {
+  const bx = stadiumBuilding.x;
+  const bz = stadiumBuilding.z + 30;
+  band = createMarchingBand(scene, bx, bz);
+  interactionZones.push({ x: bx, z: bz + 2, radius: 8, key: "band", label: "Cheer for M4" });
+}
 
 RETAIL_NEAR_UNION.forEach((r) => {
   interactionZones.push({ x: r.x, z: r.z, radius: 3, key: "shopnote", label: `Visit ${r.name}`, note: r.name });
@@ -878,6 +892,7 @@ const MINIGAMES = {
   vending: mountVending,
   achievements: mountAchievements,
   onboarding: mountOnboarding,
+  band: mountBand,
 };
 
 function closeModal() {
@@ -1158,6 +1173,7 @@ function animate() {
   updateWeatherParticles(dt);
   traffic?.update(dt);
   pedestrians.update(dt);
+  band?.update(clock.elapsedTime);
   minimap.update({ x: avatar.position.x, z: avatar.position.z, rotY: avatar.rotation.y, peers });
   renderer.render(scene, camera);
 }

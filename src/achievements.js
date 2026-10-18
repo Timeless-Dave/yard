@@ -20,6 +20,7 @@ export const ACHIEVEMENTS = [
   { id: "fresh_fit", icon: "✨", name: "Fresh Fit", desc: "Equip a cosmetic" },
   { id: "corkboard_poster", icon: "📌", name: "Word on the Yard", desc: "Post to the corkboard" },
   { id: "night_owl", icon: "🌙", name: "Night Owl", desc: "Toggle Night Mode" },
+  { id: "band_fan", icon: "🎺", name: "M4 Fan", desc: "Cheer the Marching Musical Machine of the Mid-South" },
 ];
 
 function loadLocal() {
