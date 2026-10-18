@@ -104,12 +104,19 @@ try {
 
   await check("rate limiting: a second message within 3s is refused", async () => {
     await alice.page.waitForTimeout(3500);
-    await alice.page.fill("#chat-input", "one");
+    // Back to back, with no wait in between: waiting for "one" to render
+    // first can itself take over 3s on a slow CI runner, which would make
+    // "two" legitimately allowed.
+    await alice.page.fill("#chat-input", "first-burst");
     await alice.page.press("#chat-input", "Enter");
-    await alice.page.locator("#chat-list", { hasText: "one" }).waitFor({ timeout: 20000 });
-    await alice.page.fill("#chat-input", "two");
+    await alice.page.fill("#chat-input", "second-burst");
     await alice.page.press("#chat-input", "Enter");
     await alice.page.locator("#chat-status", { hasText: "Slow down" }).waitFor({ timeout: 20000 });
+    await bob.page.locator("#chat-list", { hasText: "first-burst" }).waitFor({ timeout: 20000 });
+    await bob.page.waitForTimeout(2000);
+    if (await bob.page.locator("#chat-list", { hasText: "second-burst" }).count()) {
+      throw new Error("the throttled message still reached the other player");
+    }
   });
 
   await check("markup in messages renders as text, never as HTML", async () => {
