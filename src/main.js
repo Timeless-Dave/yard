@@ -24,6 +24,8 @@ import { createPhotoBoothArch } from "./photobooth.js";
 import { mountPhotoBooth } from "./minigames/photobooth.js";
 import { mountDoubleDutch } from "./minigames/doubledutch.js";
 import { mountHopscotch } from "./minigames/hopscotch.js";
+import { mountBoombox } from "./minigames/boombox.js";
+import { isBoomboxPlaying, stopBoombox } from "./sound.js";
 import { initMinimap } from "./minimap.js";
 import { playOpen, playClose, playClick, isMuted, toggleMuted } from "./sound.js";
 import { mountAchievements } from "./minigames/achievements.js";
@@ -705,6 +707,35 @@ hopscotchGrid.receiveShadow = true;
 scene.add(hopscotchGrid);
 interactionZones.push({ x: HS_X, z: HS_Z, radius: 3, key: "hopscotch", label: "Play Hopscotch" });
 
+// ---- Boombox — bring your own block party ----
+const BB_X = -90,
+  BB_Z = 15;
+const boomboxBody = new THREE.Mesh(
+  new THREE.BoxGeometry(1.4, 0.7, 0.5),
+  new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
+);
+boomboxBody.position.set(BB_X, 0.5, BB_Z);
+boomboxBody.castShadow = true;
+scene.add(boomboxBody);
+[-0.45, 0.45].forEach((ox) => {
+  const speaker = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.22, 0.22, 0.08, 16),
+    new THREE.MeshStandardMaterial({ color: 0x3a3a3a })
+  );
+  speaker.rotation.x = Math.PI / 2;
+  speaker.position.set(BB_X + ox, 0.5, BB_Z + 0.26);
+  scene.add(speaker);
+});
+const boomboxHandle = new THREE.Mesh(
+  new THREE.TorusGeometry(0.35, 0.04, 8, 16, Math.PI),
+  new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
+);
+boomboxHandle.position.set(BB_X, 0.9, BB_Z);
+boomboxHandle.rotation.x = Math.PI;
+scene.add(boomboxHandle);
+const BOOMBOX_RANGE = 20;
+interactionZones.push({ x: BB_X, z: BB_Z, radius: 3, key: "boombox", label: "Turn on the boombox" });
+
 // ---- Pager / beeper booth ----
 createBuilding({ x: 22, z: 22, w: 3, h: 3.6, d: 3, color: 0xd9272e, label: "Page Somebody" });
 interactionZones.push({ x: 22, z: 22, radius: 3, key: "pager", label: "Check the pager" });
@@ -975,6 +1006,7 @@ const MINIGAMES = {
   band: mountBand,
   doubledutch: mountDoubleDutch,
   hopscotch: mountHopscotch,
+  boombox: mountBoombox,
   photobooth: (root, opts) =>
     mountPhotoBooth(root, {
       ...opts,
@@ -1269,6 +1301,9 @@ function animate() {
   traffic?.update(dt);
   pedestrians.update(dt);
   band?.update(clock.elapsedTime);
+  if (isBoomboxPlaying() && Math.hypot(avatar.position.x - BB_X, avatar.position.z - BB_Z) > BOOMBOX_RANGE) {
+    stopBoombox();
+  }
   minimap.update({ x: avatar.position.x, z: avatar.position.z, rotY: avatar.rotation.y, peers });
   renderer.render(scene, camera);
 }

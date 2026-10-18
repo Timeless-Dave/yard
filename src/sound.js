@@ -68,6 +68,42 @@ export function playDrumline() {
   tone(440, { duration: 0.35, delay: 0.42, type: "sawtooth", gain: 0.1 });
 }
 
+// ---- Boombox — a looping procedural beat, bring-your-own-block-party ----
+const BOOMBOX_GENRES = {
+  old_school: { bpm: 96, kick: 90, snare: 220, hat: 2200 },
+  go_go: { bpm: 112, kick: 80, snare: 260, hat: 2600 },
+  bounce: { bpm: 128, kick: 70, snare: 300, hat: 3000 },
+};
+let boomboxTimer = null;
+let boomboxStep = 0;
+
+export function startBoombox(genre = "old_school") {
+  stopBoombox();
+  const cfg = BOOMBOX_GENRES[genre] || BOOMBOX_GENRES.old_school;
+  const stepMs = 60000 / cfg.bpm / 2; // 8th notes
+  boomboxStep = 0;
+  function tick() {
+    const beatInBar = boomboxStep % 8;
+    if (beatInBar === 0 || beatInBar === 4) tone(cfg.kick, { duration: 0.12, type: "sine", gain: 0.2 });
+    if (beatInBar === 2 || beatInBar === 6) tone(cfg.snare, { duration: 0.08, type: "triangle", gain: 0.14 });
+    if (beatInBar % 2 === 0) tone(cfg.hat, { duration: 0.03, type: "square", gain: 0.05 });
+    boomboxStep++;
+  }
+  tick();
+  boomboxTimer = setInterval(tick, stepMs);
+}
+
+export function stopBoombox() {
+  if (boomboxTimer) {
+    clearInterval(boomboxTimer);
+    boomboxTimer = null;
+  }
+}
+
+export function isBoomboxPlaying() {
+  return boomboxTimer !== null;
+}
+
 export function playNotify() {
   tone(740, { duration: 0.1, type: "sine" });
   tone(740, { duration: 0.1, delay: 0.14, type: "sine" });
