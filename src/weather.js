@@ -1,9 +1,14 @@
-// Real weather + day/night for UAPB (Pine Bluff, AR), via Open-Meteo —
-// free, keyless, no account needed. Refreshes periodically so the Yard's
-// sky actually matches what's happening outside.
-const LAT = 34.2422394;
-const LON = -92.0206016;
+// Real weather + day/night for the active campus, via Open-Meteo — free,
+// keyless, no account needed. Refreshes periodically so the Yard's sky
+// actually matches what's happening outside.
+let LAT = 34.2422394;
+let LON = -92.0206016;
 const REFRESH_MS = 15 * 60 * 1000;
+
+export function setWeatherLocation(lat, lon) {
+  LAT = lat;
+  LON = lon;
+}
 
 const WEATHER_CODES = {
   0: { label: "Clear", icon: "☀️", category: "clear" },

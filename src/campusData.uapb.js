@@ -1,14 +1,15 @@
 // Real UAPB building positions sourced from OpenStreetMap (Overpass API),
 // projected to local meters around the W.E. O'Bryant Bell Tower and scaled
 // 0.35x for a walkable world. Footprints are stylized approximations, not
-// true building outlines.
+// true building outlines. `special` tags route to a detailed model in
+// src/buildings.js; see that file's comments for what each is built from.
 export const BUILDINGS = [
-  { name: "W.E. O'Bryant Bell Tower", kind: "landmark", color: "#f4b223", x: 0.0, z: 0.0, w: 1.7, h: 11, d: 1.7 },
-  { name: "Golden Lion Stadium", kind: "athletics", color: "#0a5c2b", x: -31.0, z: -428.9, w: 22.0, h: 11, d: 12.1 },
-  { name: "L.A. Davis, Sr. Student Union", kind: "student_life", color: "#f4b223", x: -60.1, z: -21.7, w: 11.0, h: 7, d: 8.8 },
-  { name: "John Brown Watson Memorial Library", kind: "academic", color: "#3a5c8a", x: -55.2, z: 5.7, w: 9.9, h: 8, d: 7.7 },
+  { name: "W.E. O'Bryant Bell Tower", kind: "landmark", special: "bell_tower", color: "#f4b223", x: 0.0, z: 0.0, w: 1.7, h: 11, d: 1.7 },
+  { name: "Golden Lion Stadium", kind: "athletics", special: "stadium", color: "#0a5c2b", x: -31.0, z: -428.9, w: 22.0, h: 11, d: 12.1 },
+  { name: "L.A. Davis, Sr. Student Union", kind: "student_life", special: "union_cantilever", color: "#f4b223", x: -60.1, z: -21.7, w: 11.0, h: 7, d: 8.8 },
+  { name: "John Brown Watson Memorial Library", kind: "academic", special: "library", color: "#3a5c8a", x: -55.2, z: 5.7, w: 9.9, h: 8, d: 7.7 },
   { name: "Health, Physical Education & Recreation (HPER)", kind: "athletics", color: "#2d6b4a", x: -123.1, z: -146.6, w: 12.1, h: 7, d: 8.8 },
-  { name: "Administration Building", kind: "academic", color: "#8a3b2b", x: 60.0, z: -66.6, w: 11.0, h: 9, d: 7.7 },
+  { name: "Administration Building", kind: "academic", special: "columns", color: "#8a3b2b", x: 60.0, z: -66.6, w: 11.0, h: 9, d: 7.7 },
   { name: "Dawson-Hicks Hall", kind: "academic", color: "#5a4a8a", x: 13.5, z: 34.0, w: 8.8, h: 7, d: 6.6 },
   { name: "Hathaway-Howard Fine Arts Center", kind: "arts", color: "#7a2d8a", x: 26.1, z: 57.7, w: 9.9, h: 7, d: 7.2 },
   { name: "Caldwell Hall", kind: "academic", color: "#3a5c8a", x: 32.3, z: 0.7, w: 7.7, h: 6, d: 6.1 },
@@ -48,4 +49,26 @@ export const FICTIONAL_RECREATION = [
   { name: "Golf Driving Range", x: -40, z: -470, w: 10, d: 20 },
 ];
 
-export const CENTER = { x: -60.1, z: -21.7 }; // Student Union — the Yard hub
+export const VENDING_SPOTS = [
+  [-66, -20],
+  [-96, 12],
+  [-121, -142],
+];
+
+export const PARTY_SPOTS = {
+  bell_tower_yard: { label: "The Yard (Bell Tower)", x: 10, z: -10 },
+  union_courtyard: { label: "Student Union Courtyard", x: -68, z: -30 },
+  dorm_block: { label: "Dorm Block (Harrold)", x: -92, z: 18 },
+  stadium_lot: { label: "Stadium Lot", x: -24, z: -418 },
+};
+
+export const CAMPUS_META = {
+  id: "uapb",
+  label: "UAPB",
+  shortName: "UAPB",
+  mascot: "Golden Lions",
+  primaryColor: "#f4b223",
+  lat: 34.2422394,
+  lon: -92.0206016,
+  location: "Pine Bluff, AR",
+};

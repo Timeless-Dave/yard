@@ -13,9 +13,8 @@ import { mountStore } from "./minigames/store.js";
 import { isHalloween } from "./seasonal.js";
 import { mountParties } from "./minigames/parties.js";
 import { mountVending } from "./minigames/vending.js";
-import { PARTY_SPOTS } from "./partySpots.js";
-import { startWeatherLoop, onWeatherChange } from "./weather.js";
-import { BUILDINGS, REAL_RECREATION, RETAIL_NEAR_UNION, FICTIONAL_RECREATION } from "./campusData.js";
+import { startWeatherLoop, onWeatherChange, setWeatherLocation } from "./weather.js";
+import { getActiveCampus, setActiveCampusId, CAMPUSES } from "./campuses.js";
 import { createBellTower, createAcademicHall, createModernHall, createDormHall, createStadiumComplex, createStudentUnion, createLibrary } from "./buildings.js";
 import { initMinimap } from "./minimap.js";
 import { playOpen, playClose, playClick, isMuted, toggleMuted } from "./sound.js";
@@ -27,6 +26,55 @@ import { onAuthChange } from "./auth.js";
 import { supabase, ONLINE } from "./supabase.js";
 import { joinPresence, leavePresence, updateMyPosition, setMyIdentity, onPeersChange } from "./multiplayer.js";
 import { watchWallet, stopWatchingWallet, onBalanceChange } from "./economy.js";
+
+// ---- Active campus (switchable via the 🏫 Campus chip; see src/campuses.js) ----
+const ACTIVE_CAMPUS = getActiveCampus();
+const CAMPUS_META = ACTIVE_CAMPUS.meta;
+const { BUILDINGS, REAL_RECREATION, RETAIL_NEAR_UNION, FICTIONAL_RECREATION, VENDING_SPOTS, PARTY_SPOTS } = ACTIVE_CAMPUS.data;
+
+document.title = `The Yard — ${CAMPUS_META.label} Homecoming`;
+const brandTextEl = document.getElementById("brand-text");
+if (brandTextEl) brandTextEl.textContent = `The Yard — ${CAMPUS_META.shortName}`;
+const voteChipEl = document.getElementById("vote-chip");
+if (voteChipEl) voteChipEl.textContent = `🏆 Vote Mr./Miss ${CAMPUS_META.shortName}`;
+const weatherBadgeElEarly = document.getElementById("weather-badge");
+if (weatherBadgeElEarly) weatherBadgeElEarly.title = `Live weather · ${CAMPUS_META.location}`;
+
+const campusSwitchEl = document.getElementById("campus-switch");
+campusSwitchEl?.addEventListener("click", () => {
+  const modalRootEl = document.getElementById("modal-root");
+  const rows = Object.entries(CAMPUSES)
+    .map(([id, c]) => {
+      const active = id === CAMPUS_META.id;
+      return `<div class="lb-row${active ? " lb-me" : ""}">
+        <span class="lb-rank">🏫</span>
+        <span class="lb-name">${c.meta.label} <small style="opacity:0.6;">(${c.meta.mascot})</small></span>
+        <button class="btn ${active ? "btn-secondary" : "btn-primary"}" data-campus="${id}" ${active ? "disabled" : ""} style="padding:6px 12px;font-size:12px;">
+          ${active ? "Current" : "Switch"}
+        </button>
+      </div>`;
+    })
+    .join("");
+  modalRootEl.innerHTML = `
+    <div class="modal-backdrop">
+      <div class="modal">
+        <h3>🏫 Switch Campus</h3>
+        <p>Switching reloads the Yard on a different real HBCU campus.</p>
+        <div class="leaderboard-list">${rows}</div>
+        <button class="btn btn-secondary close" style="width:100%;margin-top:12px;">Close</button>
+      </div>
+    </div>`;
+  modalRootEl.querySelectorAll("[data-campus]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      setActiveCampusId(btn.dataset.campus);
+      location.reload();
+    });
+  });
+  modalRootEl.querySelector(".close").addEventListener("click", () => (modalRootEl.innerHTML = ""));
+  modalRootEl.querySelector(".modal-backdrop").addEventListener("click", (e) => {
+    if (e.target.classList.contains("modal-backdrop")) modalRootEl.innerHTML = "";
+  });
+});
 
 const UAPB_GOLD = 0xf4b223;
 const UAPB_BLACK = 0x121212;
@@ -170,6 +218,7 @@ function applyWeather(w) {
   }
 }
 onWeatherChange(applyWeather);
+setWeatherLocation(CAMPUS_META.lat, CAMPUS_META.lon);
 startWeatherLoop();
 
 function canvasTexture(draw, w = 256, h = 256) {
@@ -182,11 +231,23 @@ function canvasTexture(draw, w = 256, h = 256) {
   return tex;
 }
 
-// ---- Ground (sized to cover the real, OSM-derived campus footprint) ----
-const GROUND_W = 520;
-const GROUND_D = 720;
-const GROUND_CX = -50;
-const GROUND_CZ = -150;
+// ---- Ground (sized to cover the real, OSM-derived campus footprint —
+// computed per campus from its actual building/field spread, so a new
+// campus with a different real-world layout just works) ----
+const MARGIN = 80;
+const allPoints = [
+  ...BUILDINGS,
+  ...REAL_RECREATION,
+  ...FICTIONAL_RECREATION,
+  ...RETAIL_NEAR_UNION,
+  { x: 0, z: 0 }, // the Yard hub itself
+];
+const xs = allPoints.map((p) => p.x);
+const zs = allPoints.map((p) => p.z);
+const GROUND_W = Math.max(400, Math.max(...xs) - Math.min(...xs) + MARGIN * 2);
+const GROUND_D = Math.max(400, Math.max(...zs) - Math.min(...zs) + MARGIN * 2);
+const GROUND_CX = (Math.max(...xs) + Math.min(...xs)) / 2;
+const GROUND_CZ = (Math.max(...zs) + Math.min(...zs)) / 2;
 const X_MIN = GROUND_CX - GROUND_W / 2 + 10;
 const X_MAX = GROUND_CX + GROUND_W / 2 - 10;
 const Z_MIN = GROUND_CZ - GROUND_D / 2 + 10;
@@ -297,31 +358,33 @@ function createBuilding({ x, z, w, h, d, color, label, rotY = 0 }) {
   return group;
 }
 
-// Real UAPB buildings, positioned from OpenStreetMap data (see campusData.js).
-// The popular/iconic ones get researched, detailed models (src/buildings.js);
-// everything else still gets a labeled, colored building.
+// Real campus buildings, positioned from OpenStreetMap data (see
+// src/campusData.*.js). Buildings tagged `special` get a researched,
+// detailed model (src/buildings.js); everything else gets a generic
+// treatment based on `kind` — this makes the whole thing campus-agnostic,
+// so a new campus just needs data, not new dispatch logic.
 BUILDINGS.forEach((b) => {
-  if (b.name === "W.E. O'Bryant Bell Tower") {
+  if (b.special === "bell_tower") {
     createBellTower(scene, b.x, b.z);
     return;
   }
-  if (b.name === "Golden Lion Stadium") {
+  if (b.special === "stadium") {
     createStadiumComplex(scene, b.x, b.z);
     return;
   }
-  if (b.name === "Administration Building") {
-    createModernHall(scene, { x: b.x, z: b.z, w: b.w, h: b.h, d: b.d, label: b.name, color: b.color, columns: true });
-    return;
-  }
-  if (b.kind === "student_life") {
+  if (b.special === "union_cantilever") {
     createStudentUnion(scene, { x: b.x, z: b.z, w: b.w, h: b.h, d: b.d, label: b.name });
     return;
   }
-  if (b.name === "John Brown Watson Memorial Library") {
+  if (b.special === "library") {
     createLibrary(scene, { x: b.x, z: b.z, w: b.w, h: b.h, d: b.d, label: b.name });
     return;
   }
-  if (b.kind === "arts" || b.kind === "athletics" || b.kind === "admin") {
+  if (b.special === "columns") {
+    createModernHall(scene, { x: b.x, z: b.z, w: b.w, h: b.h, d: b.d, label: b.name, color: b.color, columns: true });
+    return;
+  }
+  if (b.kind === "student_life" || b.kind === "arts" || b.kind === "athletics" || b.kind === "admin") {
     createModernHall(scene, { x: b.x, z: b.z, w: b.w, h: b.h, d: b.d, label: b.name, color: b.color });
     return;
   }
@@ -582,9 +645,7 @@ function createVendingMachine(x, z) {
   scene.add(body, screen);
   interactionZones.push({ x, z, radius: 2.5, key: "vending", label: "Get a snack" });
 }
-createVendingMachine(-66, -20); // Student Union
-createVendingMachine(-96, 12); // Dorm block
-createVendingMachine(-121, -142); // HPER
+VENDING_SPOTS.forEach(([x, z]) => createVendingMachine(x, z));
 
 // ---- Seasonal: Halloween "Harvest Bash" decorations ----
 function createPumpkin(x, z) {
@@ -862,7 +923,7 @@ let authUser = null;
 function updatePlayerCountLabel() {
   if (!ONLINE) return;
   const count = peers.size + (authUser ? 1 : 0);
-  playerCountEl.innerHTML = `<b>${count}</b> Golden Lion${count === 1 ? "" : "s"} on the Yard · free`;
+  playerCountEl.innerHTML = `<b>${count}</b> ${CAMPUS_META.mascot} on the Yard · free`;
 }
 
 onAuthChange(async (state) => {
