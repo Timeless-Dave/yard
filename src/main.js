@@ -15,7 +15,7 @@ import { mountParties } from "./minigames/parties.js";
 import { mountVending } from "./minigames/vending.js";
 import { startWeatherLoop, onWeatherChange, setWeatherLocation } from "./weather.js";
 import { getActiveCampus, setActiveCampusId, CAMPUSES } from "./campuses.js";
-import { createBellTower, createAcademicHall, createModernHall, createDormHall, createStadiumComplex, createStudentUnion, createLibrary, createGymComplex, createFineArtsCenter, createSTEMBuilding } from "./buildings.js";
+import { createBellTower, createAcademicHall, createModernHall, createDormHall, createStadiumComplex, createStudentUnion, createLibrary, createGymComplex, createFineArtsCenter, createSTEMBuilding, createCaldwellHall } from "./buildings.js";
 import { createRoadNetwork, createTraffic } from "./traffic.js";
 import { initMinimap } from "./minimap.js";
 import { playOpen, playClose, playClick, isMuted, toggleMuted } from "./sound.js";
@@ -395,6 +395,10 @@ BUILDINGS.forEach((b) => {
   }
   if (b.special === "stem") {
     createSTEMBuilding(scene, { x: b.x, z: b.z, w: b.w, h: b.h, d: b.d, label: b.name, color: b.color });
+    return;
+  }
+  if (b.special === "caldwell") {
+    createCaldwellHall(scene, { x: b.x, z: b.z, w: b.w, h: b.h, d: b.d, label: b.name });
     return;
   }
   if (b.kind === "student_life" || b.kind === "arts" || b.kind === "athletics" || b.kind === "admin") {

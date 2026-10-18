@@ -261,10 +261,23 @@ export function createBellTower(scene, x, z) {
   return group;
 }
 
+// Small deterministic hash so buildings sharing a template (academic halls,
+// dorms) get a stable but varied look from their own name, instead of
+// looking like exact copies when placed near each other.
+function seedFromLabel(label) {
+  const s = label || "";
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
 // ---- Collegiate Gothic academic hall (à la Caldwell Hall) ----
 export function createAcademicHall(scene, { x, z, w, h, d, label, brick = "#7a2e22" }) {
   const group = new THREE.Group();
   const cream = "#e8e2d0";
+  const seed = seedFromLabel(label);
+  const hasGable = seed % 3 !== 0; // most get the gable; some get a plain parapet
+  const corniceTone = seed % 2 === 0 ? cream : "#d8cfb8";
 
   const frontTex = windowGridTexture({ brick, rows: 2, cols: Math.max(4, Math.round(w)) });
   const sideTex = windowGridTexture({ brick, rows: 2, cols: Math.max(2, Math.round(d * 0.6)) });
@@ -278,26 +291,36 @@ export function createAcademicHall(scene, { x, z, w, h, d, label, brick = "#7a2e
   body.receiveShadow = true;
   group.add(body);
 
-  // cream cornice
+  // cornice
   const cornice = new THREE.Mesh(
     new THREE.BoxGeometry(w * 1.02, 0.25, d * 1.02),
-    new THREE.MeshStandardMaterial({ color: cream })
+    new THREE.MeshStandardMaterial({ color: corniceTone })
   );
   cornice.position.y = h + 0.12;
   group.add(cornice);
 
-  // stepped entrance gable, centered on the front face
-  const gableW = Math.min(w * 0.22, 2.2);
-  const gable = new THREE.Mesh(new THREE.BoxGeometry(gableW, 0.9, 0.3), new THREE.MeshStandardMaterial({ color: cream }));
-  gable.position.set(0, h + 0.6, d / 2 - 0.1);
-  group.add(gable);
-  const gableTop = new THREE.Mesh(
-    new THREE.ConeGeometry(gableW * 0.55, 0.5, 4),
-    new THREE.MeshStandardMaterial({ color: cream })
-  );
-  gableTop.position.set(0, h + 1.3, d / 2 - 0.1);
-  gableTop.rotation.y = Math.PI / 4;
-  group.add(gableTop);
+  if (hasGable) {
+    // stepped entrance gable, centered on the front face
+    const gableW = Math.min(w * 0.22, 2.2);
+    const gable = new THREE.Mesh(new THREE.BoxGeometry(gableW, 0.9, 0.3), new THREE.MeshStandardMaterial({ color: cream }));
+    gable.position.set(0, h + 0.6, d / 2 - 0.1);
+    group.add(gable);
+    const gableTop = new THREE.Mesh(
+      new THREE.ConeGeometry(gableW * 0.55, 0.5, 4),
+      new THREE.MeshStandardMaterial({ color: cream })
+    );
+    gableTop.position.set(0, h + 1.3, d / 2 - 0.1);
+    gableTop.rotation.y = Math.PI / 4;
+    group.add(gableTop);
+  } else {
+    // plain stepped parapet instead of a gable
+    const parapet = new THREE.Mesh(
+      new THREE.BoxGeometry(w * 0.3, 0.6, 0.25),
+      new THREE.MeshStandardMaterial({ color: cream })
+    );
+    parapet.position.set(0, h + 0.4, d / 2 - 0.05);
+    group.add(parapet);
+  }
 
   // entrance door surround
   const door = new THREE.Mesh(
@@ -315,6 +338,45 @@ export function createAcademicHall(scene, { x, z, w, h, d, label, brick = "#7a2e
 
   group.position.set(x, 0, z);
   scene.add(group);
+  return group;
+}
+
+// ---- Caldwell Hall (NRHP-listed, 1928) ----
+// Researched from Wikipedia: a T-shaped, two-story Late Gothic Revival brick
+// building with Art Deco stone panels above the central entrance. Modeled as
+// the standard academic hall plus a projecting entrance wing and a carved
+// stone panel over the door.
+export function createCaldwellHall(scene, { x, z, w, h, d, label }) {
+  const group = createAcademicHall(scene, { x: 0, z: 0, w, h, d, label: null, brick: "#5a6a8a" });
+  const cream = "#e8e2d0";
+
+  // T-shape: a projecting entrance wing
+  const wing = new THREE.Mesh(
+    new THREE.BoxGeometry(w * 0.35, h * 0.9, d * 0.45),
+    new THREE.MeshStandardMaterial({ color: "#5a6a8a" })
+  );
+  wing.position.set(0, (h * 0.9) / 2, d / 2 + (d * 0.45) / 2 - 0.1);
+  wing.castShadow = true;
+  group.add(wing);
+
+  // Art Deco stone panel over the entrance
+  const panel = new THREE.Mesh(
+    new THREE.BoxGeometry(w * 0.2, 1.1, 0.15),
+    new THREE.MeshStandardMaterial({ color: cream })
+  );
+  panel.position.set(0, h * 0.72, d / 2 + d * 0.45 + 0.02);
+  group.add(panel);
+  const panelDetail = labelPlane("UAPB · 1928", w * 0.18, 0.6, "#e8e2d0", "#2a2a2a");
+  panelDetail.position.set(0, h * 0.72, d / 2 + d * 0.45 + 0.1);
+  group.add(panelDetail);
+
+  if (label) {
+    const sign = labelPlane(label, Math.min(w * 0.6, 4.2), 1.0);
+    sign.position.set(0, h * 0.35, d / 2 + d * 0.45 + 0.03);
+    group.add(sign);
+  }
+
+  group.position.set(x, 0, z);
   return group;
 }
 
@@ -520,6 +582,9 @@ export function createDormHall(scene, { x, z, w, h, d, label, color = "#6b4423" 
   const group = new THREE.Group();
   const cream = "#e8e2d0";
   const floors = Math.max(2, Math.round(h / 2.3));
+  const seed = seedFromLabel(label);
+  const roofColor = ["#2a2a2a", "#3a2a1a", "#2a2a2a"][seed % 3];
+  const hasAwning = seed % 2 === 0;
 
   const frontTex = canvasTexture((ctx, cw, ch) => {
     const bt = brickTexture({ brick: color, rows: 10 });
@@ -556,10 +621,20 @@ export function createDormHall(scene, { x, z, w, h, d, label, color = "#6b4423" 
 
   const roof = new THREE.Mesh(
     new THREE.BoxGeometry(w * 1.02, 0.25, d * 1.02),
-    new THREE.MeshStandardMaterial({ color: "#2a2a2a" })
+    new THREE.MeshStandardMaterial({ color: roofColor })
   );
   roof.position.y = h + 0.12;
   group.add(roof);
+
+  if (hasAwning) {
+    const awning = new THREE.Mesh(
+      new THREE.BoxGeometry(Math.min(w * 0.3, 2.0), 0.15, 0.9),
+      new THREE.MeshStandardMaterial({ color: cream })
+    );
+    awning.position.set(0, 1.9, d / 2 + 0.45);
+    awning.castShadow = true;
+    group.add(awning);
+  }
 
   if (label) {
     const sign = labelPlane(label, Math.min(w * 0.7, 4.5), 1.0, "#121212", "#f4b223");
