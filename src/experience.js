@@ -73,10 +73,11 @@ export function mountExperience({ online, onEnter, onCustomize, onZoom, onRotate
   toggle.onclick = () => { const hidden = touch.classList.toggle('collapsed'); toggle.textContent = hidden ? 'Show movement' : 'Hide movement'; toggle.setAttribute('aria-expanded', String(!hidden)); reset(); };
   app.append(toggle);
   const landing = document.createElement('section'); landing.className = 'landing'; landing.setAttribute('aria-label', 'Welcome to The Yard');
-  landing.innerHTML = `<div class="landing-brand">The Yard<span>University of Arkansas at Pine Bluff</span></div><div class="landing-copy"><h1>Walk UAPB campus.</h1><p>Homecoming games, mapped roads, and buildings you can enter.</p><div class="landing-actions"><button class="btn btn-primary" id="enter-yard">Enter campus</button><button class="btn btn-secondary" id="customize-from-landing">Edit character</button></div><p class="landing-note">${online ? 'Play solo, or sign in for multiplayer.' : 'Play solo. No account needed.'}</p></div><footer>Unofficial UAPB campus game. Character mesh: Kenney Animated Characters 3 (CC0).</footer>`;
+  landing.innerHTML = `<div class="landing-rail"></div><div class="landing-sheet"><p class="landing-brand">The Yard</p><p class="landing-school">University of Arkansas at Pine Bluff</p><div class="landing-copy"><h1>Walk UAPB.</h1><p>Bell Tower, Union, library. Games on the lawn.</p><div class="landing-actions"><button class="btn btn-primary" id="enter-yard">Enter</button><button class="btn btn-secondary" id="customize-from-landing">Character</button>${online ? '<button class="btn btn-secondary" id="sign-in-from-landing">Sign in</button>' : ''}</div><p class="landing-note">${online ? 'Campus works without an account. Sign in when you want other players.' : 'No account needed.'}</p></div><footer>Unofficial. Not affiliated with UAPB.</footer></div>`;
   app.append(landing); app.classList.add('at-landing');
   const enter = () => { landing.remove(); app.classList.remove('at-landing'); onEnter(); };
   document.getElementById('enter-yard').onclick = () => { enter(); customize.focus(); };
   document.getElementById('customize-from-landing').onclick = () => { enter(); onCustomize(); };
+  document.getElementById('sign-in-from-landing')?.addEventListener('click', () => { enter(); document.querySelector('[data-modal="auth"]')?.click(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') menu.open = false; });
 }

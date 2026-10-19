@@ -62,7 +62,7 @@
         cursor: pointer; font-size: 14px;
       }
       .btn-primary { background: var(--gold); color: var(--black); }
-      .btn-secondary { background: #fff; color: var(--black); }
+      .btn-secondary { background: transparent; color: #fff; border: 1px solid #ffffff44; }
 
       .announce {
         /* Bottom-anchored: at desktop widths the chip rows fill the top of the screen. */
@@ -93,10 +93,10 @@
         display: flex; align-items: center; justify-content: center; z-index: 10;
       }
       .modal {
-        background: #1b1b1b; color: #fff; width: min(380px, 90vw); border-radius: 0;
-        padding: 22px; border: 1px solid rgba(244,178,35,0.4);
+        background: #141814; color: #f3f1ea; width: min(380px, 90vw); border-radius: 0;
+        padding: 22px 22px 18px; border: 1px solid #2a322a; border-top: 3px solid var(--gold);
       }
-      .modal h3 { margin: 0 0 8px; color: var(--gold); }
+      .modal h3 { margin: 0 0 8px; color: #fff; font-size: 22px; letter-spacing: -.02em; }
       .modal p { font-size: 14px; opacity: 0.85; line-height: 1.5; }
       .modal .close { margin-top: 14px; width: 100%; }
       .hidden { display: none !important; }
@@ -406,9 +406,7 @@
       <canvas class="minimap" id="minimap" width="160" height="160"></canvas>
 
       <div class="bottom-card">
-        <div class="label" id="player-count-label"><b>Solo mode</b> · free</div>
-        <button class="btn btn-primary" data-modal="auth">Sign up free</button>
-        <button class="btn btn-secondary" data-modal="auth">Log in</button>
+        <div class="label" id="player-count-label">Solo, UAPB campus</div>
       </div>
 
       <div class="touch-controls" id="touch-controls">

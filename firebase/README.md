@@ -53,6 +53,18 @@ corkboard, and Divine Nine plot claims, connect a free Firebase project:
     (Download a service account key from **Project Settings → Service
     accounts → Generate new private key** to get that JSON file.)
 
+## Cost cap (Blaze + $300 credit through 2027-01-16)
+
+Spark cannot run Cloud Functions. Blaze is pay as you go. This project is tuned to stay cheap:
+
+- Functions: 256 MiB, 30s timeout, max 4 instances, **no min instances** (scale to zero).
+- Stripe checkout is **not deployed** until you add Stripe secrets. Coin spend stays in Firestore.
+- Set a Google Cloud billing budget so you get mail before the credit is gone. In Cloud Console: Billing → Budgets & alerts → $10/month, alert at 50%, 90%, 100%. A budget is an **alert**, not a hard shutoff. Turn off unused APIs (Maps, unused ML) in the GCP APIs list.
+
+```
+npx firebase-tools deploy --only functions:earnCoins,functions:spendCoins,functions:purchaseWithCoins,functions:onVoteWrite,functions:onRsvpWrite,functions:moderateChat,functions:moderateCorkboard,functions:moderateCandidate,functions:moderateParty,functions:moderateProfile,functions:onReportCreated,functions:resolveReport,functions:deleteMyAccount --project yard-game
+```
+
 ## Cloud Functions
 
 Clients can never write coin balances, inventory, purchases, or the earn

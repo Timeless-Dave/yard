@@ -1,14 +1,17 @@
 import { ONLINE } from '../onlineConfig.js';
 export function mountOnboarding(root, { onClose } = {}) {
   root.innerHTML = `<div class="modal game-modal onboarding-modal">
-    <h3>Find your way around UAPB</h3>
-    <p><b>Move:</b> WASD, arrow keys, a controller, or drag the gold joystick. Movement follows the camera. Hide the joystick with Hide movement.</p>
-    <p><b>Look closer:</b> use the Camera panel, the mouse wheel, or + and −. Q and R rotate. Press 0 to reset.</p>
-    <p><b>Join an activity:</b> approach a marked spot and press E, tap E, or use A on a controller. Explore UAPB also lists the games.</p>
-    <p><b>Change your look:</b> open My character anytime. Your appearance is saved in this browser.</p>
-    <p>${ONLINE ? 'Accounts connect you to community features. Open Account in Explore UAPB to join.' : 'This build runs solo. Online chat, voting, purchases, and shared progress need a connected backend.'}</p>
-    <p>The campus layout is stylized. Some activity locations are fictional additions.</p>
-    <button class="btn btn-primary close">Back to the Yard</button>
+    <p class="auth-kicker">How to play</p>
+    <h3>UAPB in four moves</h3>
+    <ul class="how-list">
+      <li><b>Move</b> WASD, arrows, or the gold stick. Camera sets the heading.</li>
+      <li><b>Camera</b> + / − zoom. Q / R rotate. 0 resets.</li>
+      <li><b>Act</b> Walk to a gold marker. E, tap, or controller A.</li>
+      <li><b>Character</b> My character saves on this browser.</li>
+    </ul>
+    <p class="auth-hint">${ONLINE ? 'Account is optional. Use it when you want other players, chat, or shared progress.' : 'This build is solo. Chat, voting, and the store need a connected backend.'}</p>
+    <p class="auth-hint">Layout is compressed. Some game spots are fictional.</p>
+    <button class="btn btn-primary close" type="button">Back</button>
   </div>`;
   root.querySelector('.close').onclick = onClose;
 }

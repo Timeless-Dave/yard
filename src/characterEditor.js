@@ -2,13 +2,13 @@ import * as THREE from 'three';
 import { createCharacter, normalizeLook, disposeCharacter, loadCharacterAssets } from './avatar.js';
 
 export function mountCharacterEditor(root, { look, onSave, onClose }) {
-  root.innerHTML = `<div class="modal character-editor"><div><h3>Make yourself at home.</h3><p>Choose your look. Every style is available to every gender.</p></div><div class="character-workspace"><div class="character-preview" aria-label="Live character preview"></div><form>
+  root.innerHTML = `<div class="modal character-editor"><div><p class="auth-kicker">Character</p><h3>Your look</h3><p>Every style is open to every gender.</p></div><div class="character-workspace"><div class="character-preview" aria-label="Live character preview"></div><form>
     <label>Gender<select name="gender"><option>Unspecified</option><option>Woman</option><option>Man</option><option>Nonbinary</option><option>Self-described</option></select></label>
     <label>Build<select name="build"><option>Slender</option><option>Balanced</option><option>Broad</option></select></label>
     <label>Hair<select name="hair"><option>Coils</option><option>Close crop</option><option>Locs</option><option>Bun</option><option>Bald</option></select></label>
     <label>Skin tone<input type="color" name="skin"></label><label>Top color<input type="color" name="shirt"></label>
     <label>Height<input type="range" name="height" min="0.85" max="1.15" step="0.01"></label>
-    <p class="save-note">Saved on this browser. Hair styles apply to the fallback body. The Kenney mesh (CC0) uses the published skins. Online appearance sync is not available yet.</p><button class="btn btn-primary" type="submit">Save character</button><button class="btn btn-secondary close" type="button">Cancel</button>
+    <p class="save-note">Saved on this browser. Hair is on the fallback body. Kenney skins follow gender.</p><button class="btn btn-primary" type="submit">Save character</button><button class="btn btn-secondary close" type="button">Cancel</button>
   </form></div></div>`;
   const form = root.querySelector('form');
   for (const [key, value] of Object.entries(look)) if (form.elements[key]) form.elements[key].value = value;

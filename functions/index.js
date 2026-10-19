@@ -1,3 +1,4 @@
+import { setGlobalOptions } from "firebase-functions/v2";
 import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/firestore";
 import { defineSecret, defineString } from "firebase-functions/params";
@@ -8,6 +9,15 @@ import { getDatabase } from "firebase-admin/database";
 import Stripe from "stripe";
 import { moderateText, MAX_LENGTHS } from "./moderation.js";
 import { evaluateEarn } from "./gameRules.js";
+
+// Keep idle cost at zero: no min instances, tiny memory, short timeouts.
+setGlobalOptions({
+  region: "us-central1",
+  memory: "256MiB",
+  timeoutSeconds: 30,
+  maxInstances: 4,
+  concurrency: 20,
+});
 
 initializeApp();
 const db = getFirestore();
