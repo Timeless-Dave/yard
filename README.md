@@ -103,6 +103,17 @@ one active human moderator.
    (**Settings → Secrets and variables → Actions**). The next push to `main`
    deploys with accounts and multiplayer turned on.
 
+### Vercel
+
+GitHub Pages stays the CI deploy. For a root-domain Vercel preview:
+
+1. Import `Timeless-Dave/yard` in Vercel. Framework: Vite. Output: `dist`. Leave `VITE_BASE` unset so it is `/`.
+2. Add the same `VITE_FIREBASE_*` values as environment variables.
+3. In Firebase Auth and Realtime Database, add the Vercel domain (`your-project.vercel.app`) to authorized domains.
+4. Deploy Realtime Database rules from this repo (`database.rules.json`) so the optional presence `room` field is allowed.
+
+This cannot be finished from the repo alone. Someone with the Vercel and Firebase project access has to click import and paste the keys.
+
 To develop against a local backend instead of a real project:
 
 ```bash

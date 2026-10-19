@@ -12,7 +12,7 @@ Retrieved/reviewed 2026-10-18. Reference images inform original modeled geometry
 | [UAPB library](https://uapb.edu/academics/john-brown-watson-memorial-library/) | Library services and collaborative equipment descriptions | Functional context for study interior; does not establish actual furniture positions |
 | [SAH Childress Hall](https://sah-archipedia.org/buildings/AR-01-JE10.2) | Distinguished historic former Watson Library from present library | Prevents using the wrong historic-building photo for current Watson Library |
 | [Google Maps UAPB](https://www.google.com/maps/search/?api=1&query=University+of+Arkansas+Pine+Bluff+Pine+Bluff%2C+AR) | Text listing/address available | Not used as a geometry or satellite-image source |
-| [Google Earth UAPB search](https://earth.google.com/web/search/University+of+Arkansas+at+Pine+Bluff/) | Attempted access; web tool returned an error | **Not visually verified. No claim of Earth imagery validation.** |
+| [Google Earth UAPB search](https://earth.google.com/web/search/University+of+Arkansas+at+Pine+Bluff/) | Attempted again 2026-10-19; Earth Web still did not load in this environment | **Not visually verified.** Public campus PDFs (2024 map, 2020 master plan) confirm Bell Tower / Union / Library identity relative to University Drive. They are diagrams, not satellite mensuration. A human still needs to open Earth or Maps satellite and compare footprints. |
 
 ## Image references inspected
 
@@ -24,6 +24,8 @@ The following were temporarily downloaded and visually inspected. They remain ex
 - Current library facade: https://www.ala.org/sites/default/files/advocacy/content/stateandlocal/UAPB--Library.JPG
 
 The Union reconstruction uses pale floors, gray seating, yellow chairs, wood counters/slats, glazing, and an elevator core based on those photographs. It does not claim exact room dimensions or object placement. The library study interior is illustrative and says so in the application.
+
+No public interior photograph set was found for Caldwell Hall or HPER that is sufficient to author another enterable room. Those stay exterior-only until a documented lobby source exists. Photoreal character glTF assets are also not in this repository; the in-game body remains a procedural humanoid.
 
 ## Coordinate contract
 
