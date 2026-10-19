@@ -1,5 +1,11 @@
 # The Yard — UAPB
 
+**UAPB improvement pass:** see the [technical audit and phased plan](docs/UAPB-AUDIT-AND-PLAN.md) for findings, delivered changes, and release gates. UAPB is the only active campus. This remains a prototype, not a launch-ready release.
+
+The current local build includes a focused entry screen, collapsible activity menu, analog movement controls, camera zoom/orbit/reset, an editable animated character, and basic building-footprint collision. Character appearance saves to this browser; full online appearance sync and production character art are pending. Run `npm run dev` to review it and `npm run test:mobile` for the desktop/phone experience checks.
+
+The physical-world pass now adds OSM-derived roads/footprints, destination routes, car impact/recovery, solid environment obstacles, and enterable Student Union/library spaces. See the [reference registry](docs/references/README.md) for what is verified versus illustrative. `npm run test:world` exercises those flows; `npm run import:map` rebuilds the geographic snapshot.
+
 [![CI](https://github.com/Timeless-Dave/yard/actions/workflows/ci.yml/badge.svg)](https://github.com/Timeless-Dave/yard/actions/workflows/ci.yml)
 
 Walk a 3D version of the real University of Arkansas at Pine Bluff campus,
@@ -107,7 +113,7 @@ VITE_USE_EMULATORS=true npm run dev   # terminal 2
 ## Install as an app
 
 The site is an installable PWA. On a phone, use **Add to Home Screen**
-(iOS) or the install prompt (Android/Chrome). A touch D-pad and interact
+(iOS) or the install prompt (Android/Chrome). An analog joystick and interact
 button appear on touch devices. The service worker is network-first, so
 updates always reach players, and the cache is only an offline fallback.
 
