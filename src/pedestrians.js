@@ -4,7 +4,7 @@
 // out-and-back polyline loops (jittered rectangles, L-shaped sidewalks) of
 // radius 5-10 around the hub. Purely decorative: no collision against the
 // player, no interaction, no name tags.
-import { createCharacter } from "./avatar.js";
+import { createCharacter, disposeCharacter } from "./avatar.js";
 
 const SKIN_TONES = [0x8a5a3c, 0x6b4226, 0xc99a6b, 0x4a2e1a];
 const SHIRT_COLORS = [0xf4b223, 0x121212, 0xffffff, 0x7a2e22, 0x3a5c8a];
@@ -205,5 +205,19 @@ export function createPedestrians(scene, partySpots, perSpot = 2) {
     });
   }
 
-  return { npcs, update, setWorld };
+  function refreshMeshes() {
+    npcs.forEach(npc => {
+      const parent = npc.mesh.parent;
+      const position = npc.mesh.position.clone();
+      const yaw = npc.mesh.rotation.y;
+      parent?.remove(npc.mesh);
+      disposeCharacter(npc.mesh);
+      npc.mesh = createPedestrianMesh();
+      npc.mesh.position.copy(position);
+      npc.mesh.rotation.y = yaw;
+      parent?.add(npc.mesh);
+    });
+  }
+
+  return { npcs, update, setWorld, refreshMeshes };
 }

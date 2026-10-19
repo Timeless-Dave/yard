@@ -32,7 +32,7 @@ describe('createPedestrians', () => {
   it('keeps the public API and splits idle and walking students', () => {
     const scene = { add: vi.fn() };
     const api = createPedestrians(scene, { a: { x: 0, z: 0 } }, 4);
-    expect(Object.keys(api).sort()).toEqual(['npcs', 'setWorld', 'update']);
+    expect(Object.keys(api).sort()).toEqual(['npcs', 'refreshMeshes', 'setWorld', 'update']);
     expect(api.npcs.filter(n => n.mode === 'idle')).toHaveLength(2);
     expect(api.npcs.filter(n => n.mode === 'walk')).toHaveLength(2);
   });

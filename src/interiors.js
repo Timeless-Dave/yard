@@ -2,11 +2,9 @@ import * as THREE from 'three';
 import { createCollisionWorld } from './worldPhysics.js';
 
 // Enterable interiors are keyed only off `building.special` strings that already
-// exist in campus data. Only two have documented-enough references to build.
+// exist in campus data. Rooms without public lobby photographs stay exterior-only.
 //   union_cantilever -> 'union'   (photo-referenced reconstruction)
 //   library          -> 'library' (illustrative layout, no interior photos)
-// Other specials (hper, caldwell, columns, ...) stay exterior only: there is no
-// public interior source for them, and main.js room copy only knows union/library.
 export function interiorType(building) {
   return building.special === 'union_cantilever' ? 'union' : building.special === 'library' ? 'library' : null;
 }
@@ -142,7 +140,6 @@ export function createInterior(building, level = 0) {
       zones.push({ x: -6, z: 5.5, radius: 2, key: 'cards', label: 'Play Spades in the lounge' });
     }
   } else {
-    // Services desk with a back panel so the sign has something to hang on.
     box(7, .85, 4, 6, 1.7, 1.2, '#a3815b'); box(7, 1.5, 3.1, 6, 3, .1, '#d6d2c7');
     sign('LIBRARY SERVICES', 7, 2.6, 3.17, 4.6);
     for (const x of [-10, -6, -2]) {
@@ -165,9 +162,17 @@ export function createInterior(building, level = 0) {
   }
   const world = createCollisionWorld(shapes);
   const title = building.name || (type === 'union' ? 'Student Union' : 'Library');
+  const labels = {
+    union: `${title}: ${level ? 'Upstairs lounge' : 'Ground-floor lobby'}`,
+    library: `${title}: Study floor`,
+  };
+  const confidence = {
+    union: 'Photo-referenced reconstruction; room dimensions are approximate.',
+    library: 'Illustrative study interior; actual floor plan not verified.',
+  };
   return { scene, world, zones, spawn, level, type, bounds: { xMin: -13.5, xMax: 13.5, zMin: -9.5, zMax: 9.5 },
-    label: type === 'union' ? `${title}: ${level ? 'Upstairs lounge' : 'Ground-floor lobby'}` : `${title}: Study floor`,
-    confidence: type === 'union' ? 'Photo-referenced reconstruction; room dimensions are approximate.' : 'Illustrative study interior; actual floor plan not verified.',
+    label: labels[type] || `${title}: Interior`,
+    confidence: confidence[type] || 'Illustrative interior.',
     dispose() { const gs = new Set(), ms = new Set(), ts = new Set(); scene.traverse(n => { if (n.isMesh) { gs.add(n.geometry); ms.add(n.material); if (n.material.map) ts.add(n.material.map); } }); gs.forEach(g => g.dispose()); ms.forEach(m => m.dispose()); ts.forEach(t => t.dispose()); }
   };
 }

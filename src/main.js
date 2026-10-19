@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import "./style.css";
-import { createCharacter, loadLook, disposeCharacter } from './avatar.js';
+import { createCharacter, loadLook, disposeCharacter, loadCharacterAssets } from './avatar.js';
 import { mountCharacterEditor } from './characterEditor.js';
 import { createCollisionWorld, collidersFromMeshes, sweptVehicleContact } from './worldPhysics.js';
 import { createInterior, interiorType } from './interiors.js';
@@ -916,6 +916,15 @@ function applyLook(look) {
 }
 avatar.position.set(spawnPoint.x, 0, spawnPoint.z);
 scene.add(avatar);
+loadCharacterAssets().then(() => {
+  applyLook(currentLook);
+  pedestrians.refreshMeshes();
+  for (const [key, entry] of peerMeshes) {
+    entry.group.parent?.remove(entry.group);
+    disposeCharacter(entry.group);
+    peerMeshes.delete(key);
+  }
+});
 
 {
   const start = view.offsetFor(false);

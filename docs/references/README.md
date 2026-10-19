@@ -11,8 +11,8 @@ Retrieved/reviewed 2026-10-18. Reference images inform original modeled geometry
 | [ALA library reference](https://www.ala.org/advocacy/holding-space/strengthening-communities-and-developing-leaders-hbcu-libraries) | Inspected UAPB library exterior photograph | Red brick, rectangular pale entrance piers, tall glazing, canopy; no interior geometry evidence |
 | [UAPB library](https://uapb.edu/academics/john-brown-watson-memorial-library/) | Library services and collaborative equipment descriptions | Functional context for study interior; does not establish actual furniture positions |
 | [SAH Childress Hall](https://sah-archipedia.org/buildings/AR-01-JE10.2) | Distinguished historic former Watson Library from present library | Prevents using the wrong historic-building photo for current Watson Library |
-| [Google Maps UAPB](https://www.google.com/maps/search/?api=1&query=University+of+Arkansas+Pine+Bluff+Pine+Bluff%2C+AR) | Text listing/address available | Not used as a geometry or satellite-image source |
-| [Google Earth UAPB search](https://earth.google.com/web/search/University+of+Arkansas+at+Pine+Bluff/) | Attempted again 2026-10-19; Earth Web still did not load in this environment | **Not visually verified.** Public campus PDFs (2024 map, 2020 master plan) confirm Bell Tower / Union / Library identity relative to University Drive. They are diagrams, not satellite mensuration. A human still needs to open Earth or Maps satellite and compare footprints. |
+| [Google Maps satellite at Bell Tower origin](https://www.google.com/maps/@34.24224,-92.0206,18z/data=!3m1!1e3) | Inspected 2026-10-19 at ~462 m altitude. Labels show Student Union west of the circular plaza, Watson Library west-southwest, Henderson-Young on the plaza, ROTC and Hathaway-Howard to the south. John Kennedy Dr is north of the quad. | Used only as a visual identity check. Tiles are not downloaded into the game. Screenshot: `docs/audit/maps-satellite-bell-union-library.jpg`. Google Earth Web still did not load (blank page). A University Drive search lists 1200 University Dr as the campus/bookstore address, with the Union and Caldwell/Admissions nearby. |
+| [Google Earth UAPB search](https://earth.google.com/web/search/University+of+Arkansas+at+Pine+Bluff/) | Attempted 2026-10-19; Earth Web remained blank in this browser | **Earth still not visually verified.** Maps satellite is the imagery that was actually seen. |
 
 ## Image references inspected
 
@@ -25,7 +25,9 @@ The following were temporarily downloaded and visually inspected. They remain ex
 
 The Union reconstruction uses pale floors, gray seating, yellow chairs, wood counters/slats, glazing, and an elevator core based on those photographs. It does not claim exact room dimensions or object placement. The library study interior is illustrative and says so in the application.
 
-No public interior photograph set was found for Caldwell Hall or HPER that is sufficient to author another enterable room. Those stay exterior-only until a documented lobby source exists. Photoreal character glTF assets are also not in this repository; the in-game body remains a procedural humanoid.
+No public interior photograph set was found for Caldwell Hall or HPER that is sufficient to author another enterable room. Written sources mention an Alumni Hall of Fame in the Caldwell lobby and HPER pool/courts/arena, but those are not photographs. Those buildings stay exterior-only.
+
+Character mesh: Kenney Animated Characters 3 (CC0 1.0), https://kenney.nl and https://kenney-assets.itch.io/animated-characters-3. Idle and run FBX plus humanMaleA/humanFemaleA skins ship in `public/models/kenney/`. This is a licensed stylized rig, not a photoreal scan. Procedural ellipsoids remain the fallback if FBX fails to load.
 
 ## Coordinate contract
 

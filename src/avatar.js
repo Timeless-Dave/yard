@@ -10,12 +10,81 @@ export function loadLook() {
   try { return normalizeLook(JSON.parse(localStorage.getItem('yard-look-v1')) || {}); } catch { return { ...DEFAULT_LOOK }; }
 }
 export function disposeCharacter(group) {
-  const geometries = new Set(), materials = new Set();
-  group.traverse(n => { if (n.isMesh) { geometries.add(n.geometry); materials.add(n.material); } });
+  group.userData.mixer?.stopAllAction();
+  const geometries = new Set(), materials = new Set(), textures = new Set();
+  group.traverse(n => { if (n.isMesh) { geometries.add(n.geometry); materials.add(n.material); if (n.material?.map) textures.add(n.material.map); } });
   geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose());
+}
+let kenney = null;
+export function characterAssetsReady() { return Boolean(kenney); }
+export async function loadCharacterAssets() {
+  if (kenney) return kenney;
+  try {
+    const [{ FBXLoader }, { SkeletonUtils }] = await Promise.all([
+      import('three/addons/loaders/FBXLoader.js'),
+      import('three/addons/utils/SkeletonUtils.js'),
+    ]);
+    const loader = new FBXLoader();
+    const base = `${import.meta.env.BASE_URL}models/kenney/`;
+    const textures = new THREE.TextureLoader();
+    const [model, idleFile, runFile, male, female] = await Promise.all([
+      loader.loadAsync(base + 'characterMedium.fbx'),
+      loader.loadAsync(base + 'idle.fbx'),
+      loader.loadAsync(base + 'run.fbx'),
+      textures.loadAsync(base + 'humanMaleA.png'),
+      textures.loadAsync(base + 'humanFemaleA.png'),
+    ]);
+    male.colorSpace = THREE.SRGBColorSpace; female.colorSpace = THREE.SRGBColorSpace;
+    male.flipY = false; female.flipY = false;
+    const idle = idleFile.animations[0], run = runFile.animations[0];
+    if (!idle || !run) throw new Error('Kenney idle/run clips missing');
+    const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
+    kenney = {
+      model, idle, run, male, female, SkeletonUtils,
+      scale: size.y > 0.01 ? 1.85 / size.y : 0.02,
+    };
+  } catch (error) {
+    console.warn('[The Yard] Kenney character failed to load; using the procedural silhouette.', error);
+    kenney = null;
+  }
+  return kenney;
+}
+function createRiggedCharacter(look) {
+  const { SkeletonUtils, model, idle, run, male, female, scale } = kenney;
+  const group = new THREE.Group();
+  const body = SkeletonUtils.clone(model);
+  body.scale.setScalar(scale * look.height);
+  const map = look.gender === 'Woman' ? female : male;
+  body.traverse(n => {
+    if (!n.isMesh) return;
+    n.castShadow = true; n.receiveShadow = true;
+    const material = n.material.clone();
+    material.map = map;
+    material.color = new THREE.Color(look.shirt).lerp(new THREE.Color('#ffffff'), 0.65);
+    n.material = material;
+  });
+  group.add(body);
+  let shirtMesh = null;
+  body.traverse(n => { if (!shirtMesh && n.isMesh) shirtMesh = n; });
+  const mixer = new THREE.AnimationMixer(body);
+  const idleAction = mixer.clipAction(idle); idleAction.play();
+  const runAction = mixer.clipAction(run); runAction.enabled = false;
+  group.userData.mixer = mixer;
+  group.userData.torso = shirtMesh || body;
+  group.userData.animate = (dt, speed = 0) => {
+    const moving = speed > 0.08;
+    if (moving && !runAction.isRunning()) { runAction.enabled = true; runAction.reset().play(); idleAction.crossFadeTo(runAction, 0.18, false); }
+    if (!moving && runAction.isRunning()) { idleAction.reset().play(); runAction.crossFadeTo(idleAction, 0.18, false); }
+    mixer.update(dt);
+  };
+  return group;
 }
 export function createCharacter(input = {}) {
   const look = normalizeLook(input);
+  if (kenney) return createRiggedCharacter(look);
+  return createProceduralCharacter(look);
+}
+function createProceduralCharacter(look) {
   const group = new THREE.Group();
   const rig = new THREE.Group(); group.add(rig);
   const mat = color => new THREE.MeshStandardMaterial({ color, roughness: .85 });

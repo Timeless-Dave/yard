@@ -196,11 +196,11 @@ This update advances phases 1, 3, 4 and 5. It does not mark the entire roadmap c
 1. Interiors are available for the Student Union and current library only. Other destinations say exterior only. No claim that every UAPB building is modeled inside.
 2. There is no surveyed floor plan, terrain elevation model, staircase locomotion, full rigid-body/ragdoll simulation, or vehicle-to-vehicle traffic simulation. Endpoint traffic reversal remains a simplified behavior.
 3. Generic mapped buildings now use polygon collision, keeping irregular footprint openings clear. Special landmark meshes still use conservative bounds; finer authored collision is needed for their arches and alcoves.
-4. Road/building geometry comes from OSM plus official-map identity checks; exact entrance bearings, road widths and present-day construction need verification. Google Earth imagery was not accessible and has not been inspected.
+4. Road/building geometry comes from OSM plus official-map identity checks. Google Earth Web still did not load. Google Maps satellite at 34.24224,-92.0206 (2026-10-19) shows Union west of the Bell Tower plaza and Watson Library WSW, which matches the OSM X-east/Z-south origin. Entrance bearings, road widths, and University Drive alignment still need a closer pass. Imagery is not a game texture.
 5. Some temporary Homecoming props and activity placements are still fictional and need relocation/review against the corrected building footprints.
 6. Remote players still appear at their exterior location while a user is inside; proper per-room multiplayer instances require a backend schema and validation update.
 7. Routes do not yet reroute automatically, obey crosswalk signals, or certify accessible travel. They avoid static geometry; moving vehicles remain hazards.
-8. Art remains stylized procedural geometry, not photorealism. New body styles, actual production character rigs, photographic material authoring and full campus exterior art remain phase-2/3 work.
+8. Player/NPC bodies now load Kenney Animated Characters 3 (CC0 FBX idle/run). Hair still only exists on the procedural fallback. Photoreal scanned humans are not in the repository.
 
 ### Evidence and reproducibility
 
