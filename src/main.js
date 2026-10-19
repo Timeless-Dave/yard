@@ -1,5 +1,12 @@
 import * as THREE from "three";
 import "./style.css";
+import { createCharacter, loadLook, disposeCharacter } from './avatar.js';
+import { mountCharacterEditor } from './characterEditor.js';
+import { createCollisionWorld, collidersFromMeshes, sweptVehicleContact } from './worldPhysics.js';
+import { createInterior, interiorType } from './interiors.js';
+import { createCampusNavigation } from './mapNavigation.js';
+import { mountExperience } from './experience.js';
+import { createCameraController } from './cameraController.js';
 import { mountCardGame } from "./minigames/cards.js";
 import { mountStepShow } from "./minigames/stepshow.js";
 import { mountDominoes } from "./minigames/dominoes.js";
@@ -18,9 +25,9 @@ import { mountLionsDen } from "./minigames/lionsden.js";
 import { mountModQueue } from "./minigames/modqueue.js";
 import { mountGuidelines } from "./minigames/guidelines.js";
 import { startWeatherLoop, onWeatherChange, setWeatherLocation } from "./weather.js";
-import { getActiveCampus, setActiveCampusId, CAMPUSES } from "./campuses.js";
-import { createBellTower, createAcademicHall, createModernHall, createDormHall, createStadiumComplex, createStudentUnion, createLibrary, createGymComplex, createFineArtsCenter, createSTEMBuilding, createCaldwellHall } from "./buildings.js";
-import { createRoadNetwork, createTraffic } from "./traffic.js";
+import { getActiveCampus } from "./campuses.js";
+import { createFootprintBuilding, createBellTower, createAcademicHall, createModernHall, createDormHall, createStadiumComplex, createStudentUnion, createLibrary, createGymComplex, createFineArtsCenter, createSTEMBuilding, createCaldwellHall } from "./buildings.js";
+import { createMappedRoadNetwork, createMappedTraffic } from "./traffic.js";
 import { createPedestrians } from "./pedestrians.js";
 import { createMarchingBand } from "./band.js";
 import { mountBand } from "./minigames/band.js";
@@ -33,7 +40,7 @@ import { isBoomboxPlaying, stopBoombox } from "./sound.js";
 import { initMinimap } from "./minimap.js";
 import { playOpen, playClose, playClick, isMuted, toggleMuted } from "./sound.js";
 import { mountAchievements } from "./minigames/achievements.js";
-import { mountOnboarding, hasSeenOnboarding } from "./minigames/onboarding.js";
+import { mountOnboarding } from "./minigames/onboarding.js";
 import { unlockAchievement } from "./achievements.js";
 import { mountAuthModal } from "./authModal.js";
 import { onAuthChange } from "./auth.js";
@@ -45,51 +52,19 @@ import { watchWallet, stopWatchingWallet, onBalanceChange } from "./economy.js";
 // ---- Active campus (switchable via the 🏫 Campus chip; see src/campuses.js) ----
 const ACTIVE_CAMPUS = getActiveCampus();
 const CAMPUS_META = ACTIVE_CAMPUS.meta;
-const { BUILDINGS, REAL_RECREATION, RETAIL_NEAR_UNION, FICTIONAL_RECREATION, VENDING_SPOTS, PARTY_SPOTS, ROAD_ROUTE } = ACTIVE_CAMPUS.data;
+const { BUILDINGS, REAL_RECREATION, RETAIL_NEAR_UNION, FICTIONAL_RECREATION, VENDING_SPOTS, PARTY_SPOTS, MAP_ROADS = [], ACTIVITY_SPOTS = {} } = ACTIVE_CAMPUS.data;
+function activity(key, x, z) {
+  const spot = ACTIVITY_SPOTS[key];
+  return spot ? { x: spot.x, z: spot.z } : { x, z };
+}
 
-document.title = `The Yard — ${CAMPUS_META.label} Homecoming`;
+document.title = `The Yard: ${CAMPUS_META.label} Homecoming`;
 const brandTextEl = document.getElementById("brand-text");
 if (brandTextEl) brandTextEl.textContent = `The Yard — ${CAMPUS_META.shortName}`;
 const voteChipEl = document.getElementById("vote-chip");
-if (voteChipEl) voteChipEl.textContent = `🏆 Vote Mr./Miss ${CAMPUS_META.shortName}`;
+if (voteChipEl) voteChipEl.textContent = `Vote Mr./Miss ${CAMPUS_META.shortName}`;
 const weatherBadgeElEarly = document.getElementById("weather-badge");
 if (weatherBadgeElEarly) weatherBadgeElEarly.title = `Live weather · ${CAMPUS_META.location}`;
-
-const campusSwitchEl = document.getElementById("campus-switch");
-campusSwitchEl?.addEventListener("click", () => {
-  const modalRootEl = document.getElementById("modal-root");
-  const rows = Object.entries(CAMPUSES)
-    .map(([id, c]) => {
-      const active = id === CAMPUS_META.id;
-      return `<div class="lb-row${active ? " lb-me" : ""}">
-        <span class="lb-rank">🏫</span>
-        <span class="lb-name">${c.meta.label} <small style="opacity:0.6;">(${c.meta.mascot})</small></span>
-        <button class="btn ${active ? "btn-secondary" : "btn-primary"}" data-campus="${id}" ${active ? "disabled" : ""} style="padding:6px 12px;font-size:12px;">
-          ${active ? "Current" : "Switch"}
-        </button>
-      </div>`;
-    })
-    .join("");
-  modalRootEl.innerHTML = `
-    <div class="modal-backdrop">
-      <div class="modal">
-        <h3>🏫 Switch Campus</h3>
-        <p>Switching reloads the Yard on a different real HBCU campus.</p>
-        <div class="leaderboard-list">${rows}</div>
-        <button class="btn btn-secondary close" style="width:100%;margin-top:12px;">Close</button>
-      </div>
-    </div>`;
-  modalRootEl.querySelectorAll("[data-campus]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      setActiveCampusId(btn.dataset.campus);
-      location.reload();
-    });
-  });
-  modalRootEl.querySelector(".close").addEventListener("click", () => (modalRootEl.innerHTML = ""));
-  modalRootEl.querySelector(".modal-backdrop").addEventListener("click", (e) => {
-    if (e.target.classList.contains("modal-backdrop")) modalRootEl.innerHTML = "";
-  });
-});
 
 const UAPB_GOLD = 0xf4b223;
 const UAPB_BLACK = 0x121212;
@@ -111,7 +86,30 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   900
 );
-const CAM_OFFSET = new THREE.Vector3(18, 22, 18);
+const view = createCameraController();
+let enteredYard = false;
+let stickX = 0, stickZ = 0;
+let currentRoom = null, roomBuilding = null, exteriorPosition = null, exteriorCamera = null;
+let hitTime = 0, impactCooldown = 0, impactX = 0, impactZ = 0;
+function activeScene() { return currentRoom?.scene || scene; }
+const desiredCamPos = new THREE.Vector3();
+const camFrom = new THREE.Vector3();
+const camRay = new THREE.Raycaster();
+const camDir = new THREE.Vector3();
+function changeZoom(delta) { view.zoomBy(delta); }
+function resetCamera() { view.reset(); }
+function cameraOffset() { const o = view.offsetFor(Boolean(currentRoom)); return { x: o.x, y: o.y, z: o.z }; }
+function raycastCamera(from, direction, distance) {
+  camFrom.set(from.x, from.y, from.z);
+  camDir.set(direction.x, direction.y, direction.z);
+  camRay.set(camFrom, camDir);
+  camRay.far = distance;
+  const hits = camRay.intersectObjects(activeScene().children, true);
+  for (const hit of hits) {
+    if (hit.object.isMesh && !avatar.getObjectById(hit.object.id) && !hit.object.userData.noCollision) return hit.distance;
+  }
+  return null;
+}
 
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -145,9 +143,9 @@ function setNightMode(on, { manual = false } = {}) {
   skyBase.multiplyScalar(on ? 1 : dim);
   scene.background = skyBase;
   scene.fog.color = skyBase;
-  hemi.intensity = (on ? 0.22 : 0.9) * dim;
-  sun.intensity = (on ? 0.15 : 1.4) * dim;
-  nightToggleEl.textContent = on ? "☀️ Day Mode" : "🌙 Night Mode";
+  hemi.intensity = (on ? 0.65 : 1.4) * dim;
+  sun.intensity = (on ? 0.35 : 1.8) * dim;
+  nightToggleEl.textContent = on ? "Day" : "Night";
   nightToggleEl.classList.toggle("chip-active", on);
 }
 const nightToggleEl = document.getElementById("night-toggle");
@@ -159,7 +157,7 @@ nightToggleEl.addEventListener("click", () => {
 const soundToggleEl = document.getElementById("sound-toggle");
 function refreshSoundChip() {
   const muted = isMuted();
-  soundToggleEl.textContent = muted ? "🔇 Sound" : "🔊 Sound";
+  soundToggleEl.textContent = muted ? "Sound off" : "Sound on";
   soundToggleEl.classList.toggle("chip-active", !muted);
 }
 soundToggleEl.addEventListener("click", () => {
@@ -379,6 +377,7 @@ function createBuilding({ x, z, w, h, d, color, label, rotY = 0 }) {
 // treatment based on `kind` — this makes the whole thing campus-agnostic,
 // so a new campus just needs data, not new dispatch logic.
 BUILDINGS.forEach((b) => {
+  if (b.footprint && !b.special) { createFootprintBuilding(scene, b); return; }
   if (b.special === "bell_tower") {
     createBellTower(scene, b.x, b.z);
     return;
@@ -427,15 +426,11 @@ BUILDINGS.forEach((b) => {
   createAcademicHall(scene, { x: b.x, z: b.z, w: b.w, h: b.h, d: b.d, label: b.name, brick: b.color });
 });
 
-const minimap = initMinimap(document.getElementById("minimap"), { xMin: X_MIN, xMax: X_MAX, zMin: Z_MIN, zMax: Z_MAX, buildings: BUILDINGS });
+const minimap = initMinimap(document.getElementById("minimap"), { xMin: X_MIN, xMax: X_MAX, zMin: Z_MIN, zMax: Z_MAX, buildings: BUILDINGS, roads: MAP_ROADS });
 
-// Ambient road loop + looping car traffic — only on campuses with a
-// ROAD_ROUTE defined (see src/campusData.*.js).
-let traffic = null;
-if (ROAD_ROUTE) {
-  createRoadNetwork(scene, ROAD_ROUTE);
-  traffic = createTraffic(scene, ROAD_ROUTE, 4);
-}
+// Render the pinned OpenStreetMap centerlines, not the old fictional loop.
+const roadSurfaces = createMappedRoadNetwork(scene, MAP_ROADS);
+const traffic = createMappedTraffic(scene, MAP_ROADS);
 
 // Ambient NPC students strolling the campus hubs — purely decorative.
 const pedestrians = createPedestrians(scene, PARTY_SPOTS, 2);
@@ -461,8 +456,9 @@ if (stadiumBuilding) {
 }
 
 // Homecoming photo-op arch near the Bell Tower plaza.
-createPhotoBoothArch(scene, -6, 8, CAMPUS_META.shortName);
-interactionZones.push({ x: -6, z: 8, radius: 3, key: "photobooth", label: "Take a photo" });
+const photoSpot = activity("photobooth", -6, 8);
+createPhotoBoothArch(scene, photoSpot.x, photoSpot.z, CAMPUS_META.shortName);
+interactionZones.push({ x: photoSpot.x, z: photoSpot.z, radius: 3, key: "photobooth", label: "Take a photo" });
 
 RETAIL_NEAR_UNION.forEach((r) => {
   interactionZones.push({ x: r.x, z: r.z, radius: 3, key: "shopnote", label: `Visit ${r.name}`, note: r.name });
@@ -547,13 +543,16 @@ function createBillboard(x, z, rotY) {
   scene.add(board);
 }
 
-interactionZones.push({ x: 0, z: 0, radius: 5, key: "king", label: "Homecoming Throne — Vote now" });
-interactionZones.push({ x: 30, z: 18, radius: 3, key: "billboards", label: "Buy billboard ad space" });
-interactionZones.push({ x: 7, z: -5, radius: 3, key: "community", label: "Check the community corkboard" });
+const kingSpot = activity("king", 0, 12);
+const boardSpot = activity("billboards", 12, 8);
+const corkSpot = activity("community", 8, -8);
+interactionZones.push({ x: kingSpot.x, z: kingSpot.z, radius: 5, key: "king", label: "Homecoming Throne - Vote now" });
+interactionZones.push({ x: boardSpot.x, z: boardSpot.z, radius: 3, key: "billboards", label: "Buy billboard ad space" });
+interactionZones.push({ x: corkSpot.x, z: corkSpot.z, radius: 3, key: "community", label: "Check the community corkboard" });
 
-createBillboard(-10, -22, 0);
-createBillboard(10, -22, 0);
-createBillboard(22, 6, -Math.PI / 2);
+createBillboard(boardSpot.x - 6, boardSpot.z, 0);
+createBillboard(boardSpot.x + 6, boardSpot.z, 0);
+createBillboard(boardSpot.x, boardSpot.z + 8, -Math.PI / 2);
 
 // ---- Spades / Dominoes table ----
 const cardTable = new THREE.Group();
@@ -584,16 +583,18 @@ const tableLeg = new THREE.Mesh(
 );
 tableLeg.position.y = 0.45;
 cardTable.add(tableLeg);
-cardTable.position.set(-18, 0, 16);
+const cardsSpot = activity("cards", 5, 5);
+cardTable.position.set(cardsSpot.x, 0, cardsSpot.z);
 scene.add(cardTable);
-interactionZones.push({ x: -18, z: 16, radius: 3.2, key: "cards", label: "Pull up to the Spades table" });
+interactionZones.push({ x: cardsSpot.x, z: cardsSpot.z, radius: 3.2, key: "cards", label: "Pull up to the Spades table" });
 
 // ---- Step show stage ----
 const stage = new THREE.Mesh(
   new THREE.CylinderGeometry(4.5, 4.8, 0.5, 32),
   new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
 );
-stage.position.set(18, 0.25, 16);
+const stepSpot = activity("stepshow", 5, -5);
+stage.position.set(stepSpot.x, 0.25, stepSpot.z);
 stage.castShadow = true;
 stage.receiveShadow = true;
 scene.add(stage);
@@ -602,9 +603,9 @@ const stageRing = new THREE.Mesh(
   new THREE.MeshBasicMaterial({ color: UAPB_GOLD, side: THREE.DoubleSide })
 );
 stageRing.rotation.x = -Math.PI / 2;
-stageRing.position.set(18, 0.52, 16);
+stageRing.position.set(stepSpot.x, 0.52, stepSpot.z);
 scene.add(stageRing);
-interactionZones.push({ x: 18, z: 16, radius: 4.8, key: "stepshow", label: "Step on stage to rehearse" });
+interactionZones.push({ x: stepSpot.x, z: stepSpot.z, radius: 4.8, key: "stepshow", label: "Step on stage to rehearse" });
 
 // ---- Dominoes bench ----
 const domTable = new THREE.Mesh(
@@ -629,20 +630,20 @@ const domTable = new THREE.Mesh(
     }),
   })
 );
-domTable.position.set(-18, 0.75, -16);
+const domSpot = activity("dominoes", -5, 5);
+domTable.position.set(domSpot.x, 0.75, domSpot.z);
 domTable.castShadow = true;
 scene.add(domTable);
 const domLeg = new THREE.Mesh(
   new THREE.CylinderGeometry(0.2, 0.25, 0.75, 8),
   new THREE.MeshStandardMaterial({ color: 0x3a2a1a })
 );
-domLeg.position.set(-18, 0.375, -16);
+domLeg.position.set(domSpot.x, 0.375, domSpot.z);
 scene.add(domLeg);
-interactionZones.push({ x: -18, z: -16, radius: 3, key: "dominoes", label: "Pull up to the dominoes" });
+interactionZones.push({ x: domSpot.x, z: domSpot.z, radius: 3, key: "dominoes", label: "Pull up to the dominoes" });
 
 // ---- Double Dutch ropes — the classic block/sidewalk game ----
-const DD_X = -85,
-  DD_Z = 30;
+const { x: DD_X, z: DD_Z } = activity("doubledutch", -5, -5);
 [-1.8, 1.8].forEach((ox) => {
   const pole = new THREE.Mesh(
     new THREE.CylinderGeometry(0.08, 0.1, 1.6, 8),
@@ -670,8 +671,7 @@ scene.add(ddSign);
 interactionZones.push({ x: DD_X, z: DD_Z, radius: 3, key: "doubledutch", label: "Jump in on Double Dutch" });
 
 // ---- Hopscotch grid — chalk on the sidewalk ----
-const HS_X = 18,
-  HS_Z = -6;
+const { x: HS_X, z: HS_Z } = activity("hopscotch", -10, 0);
 const hopscotchGrid = new THREE.Mesh(
   new THREE.PlaneGeometry(2.4, 3.6),
   new THREE.MeshStandardMaterial({
@@ -713,8 +713,7 @@ scene.add(hopscotchGrid);
 interactionZones.push({ x: HS_X, z: HS_Z, radius: 3, key: "hopscotch", label: "Play Hopscotch" });
 
 // ---- Boombox — bring your own block party ----
-const BB_X = -90,
-  BB_Z = 15;
+const { x: BB_X, z: BB_Z } = activity("boombox", 0, 10);
 const boomboxBody = new THREE.Mesh(
   new THREE.BoxGeometry(1.4, 0.7, 0.5),
   new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
@@ -742,37 +741,39 @@ const BOOMBOX_RANGE = 20;
 interactionZones.push({ x: BB_X, z: BB_Z, radius: 3, key: "boombox", label: "Turn on the boombox" });
 
 // ---- Pager / beeper booth ----
-createBuilding({ x: 22, z: 22, w: 3, h: 3.6, d: 3, color: 0xd9272e, label: "Page Somebody" });
-interactionZones.push({ x: 22, z: 22, radius: 3, key: "pager", label: "Check the pager" });
+const pagerSpot = activity("pager", 10, 5);
+createBuilding({ x: pagerSpot.x, z: pagerSpot.z, w: 3, h: 3.6, d: 3, color: 0xd9272e, label: "Page Somebody" });
+interactionZones.push({ x: pagerSpot.x, z: pagerSpot.z, radius: 3, key: "pager", label: "Check the pager" });
 
 // ---- Cookout grill ----
 const grillDrum = new THREE.Mesh(
   new THREE.CylinderGeometry(1.4, 1.2, 1.2, 16),
   new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
 );
-grillDrum.position.set(2, 0.9, 34);
+const cookSpot = activity("cookout", -45, -10);
+grillDrum.position.set(cookSpot.x, 0.9, cookSpot.z);
 grillDrum.castShadow = true;
 scene.add(grillDrum);
 const grillLid = new THREE.Mesh(
   new THREE.SphereGeometry(1.4, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2),
   new THREE.MeshStandardMaterial({ color: 0x2a2a2a })
 );
-grillLid.position.set(2, 1.5, 34);
+grillLid.position.set(cookSpot.x, 1.5, cookSpot.z);
 scene.add(grillLid);
 const grillSign = new THREE.Mesh(
   new THREE.PlaneGeometry(2.4, 1),
   new THREE.MeshBasicMaterial({ map: labelTexture("Cookout Cook-Off", "#8a3b2b", "#fff"), transparent: true })
 );
-grillSign.position.set(2, 2.6, 34);
+grillSign.position.set(cookSpot.x, 2.6, cookSpot.z);
 scene.add(grillSign);
-interactionZones.push({ x: 2, z: 34, radius: 3, key: "cookout", label: "Work the grill" });
+interactionZones.push({ x: cookSpot.x, z: cookSpot.z, radius: 3, key: "cookout", label: "Work the grill" });
 
 // ---- Throne / King & Queen voting spot ----
 const throne = new THREE.Mesh(
   new THREE.CylinderGeometry(3, 3.4, 0.6, 32),
   new THREE.MeshStandardMaterial({ color: 0xf4b223, emissive: 0x7a5200, emissiveIntensity: 0.3 })
 );
-throne.position.set(0, 0.3, 0);
+throne.position.set(kingSpot.x, 0.3, kingSpot.z);
 throne.castShadow = true;
 scene.add(throne);
 
@@ -882,36 +883,115 @@ while (placed < 70 && attempts < 400) {
   const x = X_MIN + Math.random() * (X_MAX - X_MIN);
   const z = Z_MIN + Math.random() * (Z_MAX - Z_MIN);
   if (Math.hypot(x, z) < 22) continue;
-  const tooClose = BUILDINGS.some((b) => Math.hypot(x - b.x, z - b.z) < 10);
+  const tooClose = BUILDINGS.some(b => Math.abs(x - b.x) < b.w / 2 + 3 && Math.abs(z - b.z) < b.d / 2 + 3) || MAP_ROADS.some(road => road.points.some((b,i) => {
+    if (!i) return false; const a=road.points[i-1],dx=b.x-a.x,dz=b.z-a.z;
+    const t=THREE.MathUtils.clamp(((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz || 1),0,1);
+    return Math.hypot(x-a.x-dx*t,z-a.z-dz*t)<4;
+  }));
   if (tooClose) continue;
   createTree(x, z);
   placed++;
 }
 
+// Physical obstacles use the rendered meshes, including props and trees.
+const movingRoots = new Set([...traffic.cars.map(c => c.mesh), ...pedestrians.npcs.map(n => n.mesh), ...(band?.members || [])]);
+const world = createCollisionWorld(collidersFromMeshes(scene.children.filter(n => !movingRoots.has(n))));
+const campusBounds = { xMin: X_MIN, xMax: X_MAX, zMin: Z_MIN, zMax: Z_MAX };
+traffic.setWorld(world);
+pedestrians.setWorld(world, campusBounds);
+const spawnPoint = world.nearestClear({ x: 0, z: 10 });
+for (const building of BUILDINGS) {
+  building.enterable = Boolean(interiorType(building));
+  building.entrance = world.nearestClear({ x: building.x, z: building.z + building.d / 2 + 2 });
+  if (building.enterable && building.entrance) {
+    const marker = new THREE.Mesh(new THREE.TorusGeometry(.65, .07, 6, 24), new THREE.MeshBasicMaterial({ color: '#f4b223' }));
+    marker.rotation.x = Math.PI / 2; marker.position.set(building.entrance.x, .12, building.entrance.z); scene.add(marker);
+    interactionZones.push({ ...building.entrance, radius: 2.6, key: 'enter-building', label: `Enter ${building.name}`, building });
+  }
+}
+const statusEl = document.createElement('div'); statusEl.className = 'world-status hidden'; statusEl.setAttribute('role', 'status'); app.append(statusEl);
+let statusTimer;
+function announceWorld(text) { statusEl.textContent = text; statusEl.classList.remove('hidden'); clearTimeout(statusTimer); statusTimer = setTimeout(() => statusEl.classList.add('hidden'), 5000); }
+const roomBar = document.createElement('div'); roomBar.className = 'room-bar hidden'; roomBar.innerHTML = '<div><strong></strong><small></small></div><button class="btn btn-secondary">Exit building</button>'; app.append(roomBar);
+roomBar.querySelector('button').onclick = () => exitBuilding();
+
 // ---- Avatar ----
-const avatar = new THREE.Group();
-const torso = new THREE.Mesh(
-  new THREE.CapsuleGeometry(0.5, 1.0, 4, 8),
-  new THREE.MeshStandardMaterial({ color: UAPB_GOLD })
-);
-torso.position.y = 1.1;
-torso.castShadow = true;
-const head = new THREE.Mesh(
-  new THREE.SphereGeometry(0.4, 16, 16),
-  new THREE.MeshStandardMaterial({ color: 0x8a5a3c })
-);
-head.position.y = 2.0;
-head.castShadow = true;
-avatar.add(torso, head);
-avatar.position.set(0, 0, 10);
+let currentLook = loadLook();
+let avatar = createCharacter(currentLook);
+let torso = avatar.userData.torso;
+function applyLook(look) {
+  currentLook = look;
+  const next = createCharacter(look);
+  next.position.copy(avatar.position); next.rotation.copy(avatar.rotation);
+  activeScene().remove(avatar); disposeCharacter(avatar); avatar = next; torso = avatar.userData.torso; activeScene().add(avatar);
+}
+avatar.position.set(spawnPoint.x, 0, spawnPoint.z);
 scene.add(avatar);
 
-camera.position.copy(avatar.position).add(CAM_OFFSET);
+{
+  const start = view.offsetFor(false);
+  camera.position.set(avatar.position.x + start.x, avatar.position.y + start.y, avatar.position.z + start.z);
+}
 camera.lookAt(avatar.position);
+
+const navigation = createCampusNavigation({ scene, world, bounds: campusBounds, roads: MAP_ROADS, buildings: BUILDINGS, getPosition: () => exteriorPosition || avatar.position, onClose: () => closeModal() });
+function enterBuilding(building, level = 0) {
+  if (!interiorType(building)) return;
+  clearInput();
+  if (!currentRoom) { exteriorPosition = avatar.position.clone(); exteriorCamera = { zoom: view.zoom, yaw: view.yaw }; scene.remove(avatar); }
+  else { currentRoom.scene.remove(avatar); currentRoom.dispose(); }
+  currentRoom = createInterior(building, level); roomBuilding = building;
+  avatar.position.set(currentRoom.spawn.x, 0, currentRoom.spawn.z); avatar.rotation.set(0, Math.PI, 0); currentRoom.scene.add(avatar);
+  view.yaw = 0; view.zoom = 1.1; view.damp(10); hitTime = 0;
+  const indoor = view.offsetFor(true);
+  camera.position.set(avatar.position.x + indoor.x, avatar.position.y + indoor.y, avatar.position.z + indoor.z); camera.lookAt(avatar.position.x, 1.3, avatar.position.z);
+  roomBar.querySelector('strong').textContent = currentRoom.label; roomBar.querySelector('small').textContent = currentRoom.confidence;
+  roomBar.classList.remove('hidden'); app.classList.add('indoors');
+}
+function exitBuilding() {
+  if (!currentRoom) return;
+  clearInput(); currentRoom.scene.remove(avatar); currentRoom.dispose(); currentRoom = null; roomBuilding = null;
+  scene.add(avatar); avatar.position.copy(exteriorPosition); exteriorPosition = null;
+  view.zoom = exteriorCamera.zoom; view.yaw = exteriorCamera.yaw; view.damp(10); impactCooldown = 1.5;
+  const outdoor = view.offsetFor(false);
+  camera.position.set(avatar.position.x + outdoor.x, avatar.position.y + outdoor.y, avatar.position.z + outdoor.z);
+  roomBar.classList.add('hidden'); app.classList.remove('indoors');
+}
+function recoverPosition() {
+  if (currentRoom) exitBuilding();
+  avatar.position.set(spawnPoint.x, 0, spawnPoint.z); avatar.rotation.z = 0; hitTime = 0; impactCooldown = 2;
+  clearInput(); navigation.cancel(); resetCamera(); announceWorld('Returned to the Bell Tower plaza.');
+}
 
 // ---- Input (keyboard + gamepad + touch) ----
 const keys = {};
-window.addEventListener("keydown", (e) => (keys[e.key.toLowerCase()] = true));
+function isTyping(target) { return target?.closest?.('input, textarea, select, [contenteditable="true"]'); }
+function clearInput() { for (const key of Object.keys(keys)) keys[key] = false; stickX = stickZ = 0; }
+window.addEventListener('blur', clearInput);
+document.addEventListener('visibilitychange', () => { if (document.hidden) clearInput(); });
+window.addEventListener('keydown', e => {
+  if (isTyping(e.target) || modalIsOpen() || !enteredYard) return;
+  const key = e.key.toLowerCase();
+  if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(key)) e.preventDefault();
+  keys[key] = true;
+  if (key === '+' || key === '=') changeZoom(-.08);
+  if (key === '-') changeZoom(.08);
+  if (key === 'q') view.rotate(-.12);
+  if (key === 'r') view.rotate(.12);
+  if (key === '0') resetCamera();
+});
+renderer.domElement.addEventListener('wheel', e => {
+  if (!enteredYard || modalIsOpen()) return;
+  e.preventDefault(); changeZoom(Math.sign(e.deltaY) * .08);
+}, { passive: false });
+mountExperience({ online: ONLINE,
+  onEnter: () => { enteredYard = true; },
+  onCustomize: () => openModal('character'),
+  onNavigate: () => { if (currentRoom) announceWorld('Exit the building to plan a campus route.'); else openModal('destinations'); },
+  onRecover: recoverPosition,
+  onZoom: changeZoom, onRotate: amount => { view.rotate(amount); }, onReset: resetCamera,
+  onMove: (x, z) => { stickX = x; stickZ = z; }
+});
 window.addEventListener("keyup", (e) => (keys[e.key.toLowerCase()] = false));
 
 document.querySelectorAll(".touch-btn[data-key]").forEach((btn) => {
@@ -998,10 +1078,15 @@ function modalIsOpen() {
   return modalRoot.children.length > 0;
 }
 function tryInteract() {
-  if (activeZone && !modalIsOpen()) openModal(activeZone.key, activeZone.note);
+  if (!enteredYard || !activeZone || modalIsOpen() || hitTime > 0) return;
+  if (activeZone.key === 'enter-building') { enterBuilding(activeZone.building); return; }
+  if (activeZone.key === 'exit-building') { exitBuilding(); return; }
+  if (activeZone.key === 'floor-change') { enterBuilding(roomBuilding, currentRoom.level ? 0 : 1); return; }
+  if (activeZone.key === 'room-info') { announceWorld(currentRoom.type === 'union' ? 'The renovated Union includes mail/print services, an elevator and an upstairs student lounge. This layout is a reconstruction.' : 'The library offers study spaces, research support and technology resources. This room is an illustrative layout.'); return; }
+  openModal(activeZone.key, activeZone.note);
 }
 window.addEventListener("keydown", (e) => {
-  if (e.key.toLowerCase() === "e") tryInteract();
+  if (!isTyping(e.target) && e.key.toLowerCase() === "e") tryInteract();
 });
 
 // ---- Modals ----
@@ -1052,7 +1137,7 @@ const MINIGAMES = {
         // perf every frame), so re-render synchronously right before
         // reading pixels — otherwise toDataURL() reads an already-cleared
         // buffer and comes back blank.
-        renderer.render(scene, camera);
+        renderer.render(activeScene(), camera);
         return renderer.domElement.toDataURL("image/png");
       },
     }),
@@ -1062,6 +1147,26 @@ const MINIGAMES = {
 // every close path (button, backdrop, or opening another modal) so a closed
 // modal never keeps listening — and billing reads — in the background.
 let modalCleanup = null;
+let modalReturnFocus = null;
+function prepareDialog() {
+  const dialog = modalRoot.querySelector('.modal');
+  if (!dialog) return;
+  dialog.setAttribute('role', 'dialog'); dialog.setAttribute('aria-modal', 'true');
+  dialog.setAttribute('aria-label', dialog.querySelector('h3')?.textContent || 'The Yard');
+  dialog.tabIndex = -1; dialog.focus();
+}
+new MutationObserver(() => { if (modalRoot.querySelector('.modal:not([role])')) prepareDialog(); }).observe(modalRoot, { childList: true, subtree: true });
+document.addEventListener('keydown', e => {
+  if (!modalIsOpen()) return;
+  if (e.key === 'Escape') { e.preventDefault(); closeModal(); }
+  if (e.key === 'Tab') {
+    const items = [...modalRoot.querySelectorAll('button, input, select, textarea, a[href], [tabindex="0"]')].filter(el => !el.disabled && el.getClientRects().length);
+    const first = items[0], last = items.at(-1);
+    if (!first) { e.preventDefault(); return; }
+    if (e.shiftKey && (document.activeElement === first || document.activeElement.classList.contains('modal'))) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+});
 
 function runModalCleanup() {
   if (typeof modalCleanup === "function") modalCleanup();
@@ -1071,6 +1176,9 @@ function runModalCleanup() {
 function closeModal() {
   runModalCleanup();
   modalRoot.innerHTML = "";
+  clearInput();
+  if (modalReturnFocus?.getClientRects().length) modalReturnFocus.focus();
+  else document.querySelector('.yard-menu summary')?.focus();
   playClose();
 }
 
@@ -1087,7 +1195,14 @@ function mountInBackdrop(mount) {
 }
 
 function openModal(key, zoneNote) {
+  if (!modalIsOpen()) modalReturnFocus = document.activeElement;
+  clearInput();
   playOpen();
+  if (key === 'destinations') { mountInBackdrop(root => navigation.mount(root)); return; }
+  if (key === 'character') {
+    mountInBackdrop(root => mountCharacterEditor(root, { look: currentLook, onSave: applyLook, onClose: closeModal }));
+    return;
+  }
   if (key === "plots") {
     mountInBackdrop((root) => mountPlotClaim(root, { letters: zoneNote, onClose: closeModal }));
     return;
@@ -1187,19 +1302,7 @@ onPeersChange((updated) => {
     seen.add(key);
     let entry = peerMeshes.get(key);
     if (!entry) {
-      const group = new THREE.Group();
-      const body = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.5, 1.0, 4, 8),
-        new THREE.MeshStandardMaterial({ color: p.color ? parseInt(p.color.replace("#", ""), 16) : UAPB_GOLD })
-      );
-      body.position.y = 1.1;
-      body.castShadow = true;
-      const h = new THREE.Mesh(
-        new THREE.SphereGeometry(0.4, 16, 16),
-        new THREE.MeshStandardMaterial({ color: 0x8a5a3c })
-      );
-      h.position.y = 2.0;
-      group.add(body, h);
+      const group = createCharacter({ shirt: p.color });
       scene.add(group);
       const label = document.createElement("div");
       label.className = "peer-tag";
@@ -1210,11 +1313,13 @@ onPeersChange((updated) => {
     }
     if (typeof p.x === "number") entry.group.position.set(p.x, 0, p.z);
     if (typeof p.rotY === "number") entry.group.rotation.y = p.rotY;
+    entry.group.userData.torso.material.color.set(p.color || "#f4b223");
     entry.label.textContent = p.name || "Golden Lion";
   });
   for (const [key, entry] of peerMeshes) {
     if (!seen.has(key)) {
       scene.remove(entry.group);
+      disposeCharacter(entry.group);
       entry.label.remove();
       peerMeshes.delete(key);
     }
@@ -1231,7 +1336,7 @@ function updatePeerLabels() {
     entry.label.style.transform = `translate(-50%, -100%)`;
     entry.label.style.left = x + "px";
     entry.label.style.top = y + "px";
-    entry.label.style.display = pos.z < 1 ? "block" : "none";
+    entry.label.style.display = !currentRoom && pos.z < 1 ? "block" : "none";
   });
 }
 
@@ -1277,7 +1382,7 @@ function syncLiveParties(parties) {
     const group = createPartyMarker(p.spot);
     partyMarkers.set(p.id, group);
     const spot = PARTY_SPOTS[p.spot] || PARTY_SPOTS.bell_tower_yard;
-    interactionZones.push({ x: spot.x, z: spot.z, radius: 5, key: "parties", label: `${p.title} — RSVP / join in`, partyId: p.id });
+    interactionZones.push({ x: spot.x, z: spot.z, radius: 5, key: "parties", label: `${p.title}: RSVP / join in`, partyId: p.id });
   });
 }
 
@@ -1298,10 +1403,13 @@ if (ONLINE) {
 
 // ---- Loop ----
 const clock = new THREE.Clock();
-const SPEED = 16;
+const SPEED = 6;
+let lastMinimapUpdate = -1;
 
 function updateAvatar(dt) {
-  if (modalIsOpen()) return;
+  if (modalIsOpen() || !enteredYard) return;
+  impactCooldown = Math.max(0, impactCooldown - dt);
+  hitTime = Math.max(0, hitTime - dt);
   let dx = 0,
     dz = 0;
   if (keys["w"] || keys["arrowup"]) dz -= 1;
@@ -1310,66 +1418,110 @@ function updateAvatar(dt) {
   if (keys["d"] || keys["arrowright"]) dx += 1;
 
   const pad = pollGamepad();
-  if (pad.interact) tryInteract();
-  dx += pad.dx;
-  dz += pad.dz;
+  if (pad.interact) { tryInteract(); if (modalIsOpen()) return; }
+  dx += pad.dx + stickX;
+  dz += pad.dz + stickZ;
+  // Map screen directions into the current camera plane.
+  const offset = cameraOffset();
+  const heading = Math.atan2(offset.x, offset.z);
+  const localX = dx;
+  dx = localX * Math.cos(heading) + dz * Math.sin(heading);
+  dz = -localX * Math.sin(heading) + dz * Math.cos(heading);
+  if (hitTime > 0) { dx = 0; dz = 0; }
+  avatar.rotation.z = hitTime > 0 ? Math.sin(Math.min(1, hitTime) * Math.PI / 2) * .85 : 0;
+  avatar.userData.animate(dt, Math.min(1, Math.hypot(dx, dz)));
 
   if (dx !== 0 || dz !== 0) {
     unlockAchievement("first_steps");
     const len = Math.max(1, Math.hypot(dx, dz));
     dx /= len;
     dz /= len;
-    avatar.position.x = THREE.MathUtils.clamp(avatar.position.x + dx * SPEED * dt, X_MIN, X_MAX);
-    avatar.position.z = THREE.MathUtils.clamp(avatar.position.z + dz * SPEED * dt, Z_MIN, Z_MAX);
+    const speed = currentRoom ? 3.5 : keys.shift ? 10 : SPEED;
+    const next = (currentRoom?.world || world).move(avatar.position, dx * speed * dt, dz * speed * dt, currentRoom?.bounds || campusBounds, currentRoom ? [] : traffic.colliders());
+    avatar.position.x = next.x; avatar.position.z = next.z;
     const targetAngle = Math.atan2(dx, dz);
-    avatar.rotation.y = THREE.MathUtils.lerp(avatar.rotation.y, targetAngle, 0.2);
+    const angleDelta = Math.atan2(Math.sin(targetAngle - avatar.rotation.y), Math.cos(targetAngle - avatar.rotation.y));
+    avatar.rotation.y += angleDelta * (1 - Math.exp(-12 * dt));
   }
 
-  const desiredCamPos = avatar.position.clone().add(CAM_OFFSET);
-  camera.position.lerp(desiredCamPos, 0.08);
+  if (hitTime > 0 && !currentRoom) {
+    const next = world.move(avatar.position, impactX * dt, impactZ * dt, campusBounds);
+    avatar.position.x = next.x; avatar.position.z = next.z;
+    impactX *= Math.exp(-5 * dt); impactZ *= Math.exp(-5 * dt);
+  }
+  view.damp(dt);
+  const look = cameraOffset();
+  const pulled = view.pullForObstruction(
+    { x: avatar.position.x, y: avatar.position.y + 1.2, z: avatar.position.z },
+    { x: avatar.position.x + look.x, y: avatar.position.y + look.y, z: avatar.position.z + look.z },
+    raycastCamera
+  );
+  desiredCamPos.set(pulled.x, pulled.y, pulled.z);
+  camera.position.lerp(desiredCamPos, 1 - Math.exp(-8 * dt));
   camera.lookAt(avatar.position.x, avatar.position.y + 1, avatar.position.z);
 
-  updateMyPosition(avatar.position.x, avatar.position.z, avatar.rotation.y);
+  if (!currentRoom) updateMyPosition(avatar.position.x, avatar.position.z, avatar.rotation.y);
 }
 
 function updateInteractionPrompt() {
   activeZone = null;
-  for (const zone of interactionZones) {
+  let nearest = Infinity;
+  for (const zone of (currentRoom ? currentRoom.zones : interactionZones)) {
     const dist = Math.hypot(avatar.position.x - zone.x, avatar.position.z - zone.z);
-    if (dist < zone.radius) {
-      activeZone = zone;
-      break;
-    }
+    if (dist < zone.radius && dist < nearest) { activeZone = zone; nearest = dist; }
   }
-  if (activeZone) {
-    promptEl.style.display = "block";
-    const btn = gamepadIndex !== null ? "A" : "E";
-    promptEl.textContent = `Press ${btn} — ${activeZone.label}`;
-  } else {
-    promptEl.style.display = "none";
+  const available = Boolean(activeZone && enteredYard && !modalIsOpen() && hitTime <= 0);
+  const touchButton = document.getElementById('touch-interact'); touchButton.disabled = !available;
+  touchButton.setAttribute('aria-label', available ? activeZone.label : 'No interaction nearby');
+  promptEl.style.display = available ? 'block' : 'none';
+  if (available) {
+    const btn = gamepadIndex !== null ? 'A' : 'E';
+    promptEl.textContent = `${matchMedia('(pointer: coarse)').matches ? 'Tap E' : 'Press ' + btn} · ${activeZone.label}`;
   }
 }
 
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.1);
+  const playerBefore = { x: avatar.position.x, z: avatar.position.z };
   updateAvatar(dt);
   updateInteractionPrompt();
   updatePeerLabels();
-  updateWeatherParticles(dt);
-  traffic?.update(dt);
+  if (!currentRoom) updateWeatherParticles(dt);
+  traffic.update(dt, enteredYard && !currentRoom ? avatar.position : null);
+  if (enteredYard && !currentRoom && !modalIsOpen() && impactCooldown <= 0) {
+    for (const car of traffic.cars) {
+      if (car.speed < .4) continue;
+      if (sweptVehicleContact(playerBefore, avatar.position, car.previous, car.mesh.position, car.mesh.rotation.y)) {
+        hitTime = 1.2; impactCooldown = 3;
+        impactX = Math.sin(car.mesh.rotation.y) * Math.min(10, car.speed * 2);
+        impactZ = Math.cos(car.mesh.rotation.y) * Math.min(10, car.speed * 2);
+        car.speed = 0; clearInput(); announceWorld('Vehicle impact. Recovering… Check the road before crossing.'); break;
+      }
+    }
+  }
   pedestrians.update(dt);
   band?.update(clock.elapsedTime);
   if (isBoomboxPlaying() && Math.hypot(avatar.position.x - BB_X, avatar.position.z - BB_Z) > BOOMBOX_RANGE) {
     stopBoombox();
   }
-  minimap.update({ x: avatar.position.x, z: avatar.position.z, rotY: avatar.rotation.y, peers });
-  renderer.render(scene, camera);
+  navigation.update(clock.elapsedTime, Boolean(currentRoom));
+  if (!currentRoom && clock.elapsedTime - lastMinimapUpdate > .15) { lastMinimapUpdate = clock.elapsedTime; minimap.update({ x: avatar.position.x, z: avatar.position.z, rotY: avatar.rotation.y, peers, route: navigation.route }); }
+  renderer.render(activeScene(), camera);
 }
 animate();
 
-if (!hasSeenOnboarding()) {
-  setTimeout(() => openModal("onboarding"), 500);
+
+
+if (import.meta.env.DEV && new URLSearchParams(location.search).has('test')) {
+  window.__yardTest = {
+    state: () => ({ position: { x: avatar.position.x, z: avatar.position.z }, room: currentRoom?.type || null, level: currentRoom?.level, hitTime, cameraZoom: view.zoom, cameraYaw: view.yaw, route: navigation.route, colliders: (currentRoom?.world || world).shapes, doors: BUILDINGS.filter(b => b.enterable).map(b => ({ name: b.name, ...b.entrance })) }),
+    place: (x,z) => { avatar.position.set(x,0,z); clearInput(); },
+    move: (dx,dz) => { const p = (currentRoom?.world || world).move(avatar.position, dx, dz, currentRoom?.bounds || campusBounds); avatar.position.x=p.x;avatar.position.z=p.z; },
+    impact: () => { const c = traffic.cars[0]; const a=c.mesh.rotation.y; avatar.position.set(c.mesh.position.x+Math.sin(a)*1.3,0,c.mesh.position.z+Math.cos(a)*1.3); c.speed=4; impactCooldown=0; },
+    roomZones: () => currentRoom?.zones || [],
+    recover: recoverPosition,
+  };
 }
 
 // ---- PWA install ----

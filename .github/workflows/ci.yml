@@ -42,6 +42,8 @@ jobs:
         run: npm run test:e2e
       - name: Phones (iPhone 14, Pixel 7)
         run: npm run test:mobile
+      - name: Physical world and building interiors
+        run: npm run test:world
       - uses: actions/upload-artifact@v7
         if: always()
         with:

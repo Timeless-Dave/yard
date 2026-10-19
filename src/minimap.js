@@ -11,7 +11,7 @@ const KIND_COLORS = {
   dorm: "#a0724a",
 };
 
-export function initMinimap(canvas, { xMin, xMax, zMin, zMax, buildings }) {
+export function initMinimap(canvas, { xMin, xMax, zMin, zMax, buildings, roads = [] }) {
   const ctx = canvas.getContext("2d");
   const size = canvas.width; // square canvas, CSS controls display size
   const worldW = xMax - xMin;
@@ -19,7 +19,8 @@ export function initMinimap(canvas, { xMin, xMax, zMin, zMax, buildings }) {
   const pad = size * 0.04;
 
   function toMap(x, z) {
-    return [pad + ((x - xMin) / worldW) * (size - pad * 2), pad + ((z - zMin) / worldD) * (size - pad * 2)];
+    const scale = (size - pad * 2) / Math.max(worldW, worldD);
+    return [(size - worldW * scale) / 2 + (x - xMin) * scale, (size - worldD * scale) / 2 + (z - zMin) * scale];
   }
 
   function drawStatic() {
@@ -27,6 +28,9 @@ export function initMinimap(canvas, { xMin, xMax, zMin, zMax, buildings }) {
     ctx.fillStyle = "rgba(10,20,10,0.55)";
     ctx.fillRect(0, 0, size, size);
 
+    ctx.strokeStyle = '#899485'; ctx.lineWidth = .7;
+    roads.forEach(road => { ctx.beginPath(); road.points.forEach((p,i) => { const [x,z] = toMap(p.x,p.z); if (i) ctx.lineTo(x,z); else ctx.moveTo(x,z); }); ctx.stroke(); });
+    ctx.fillStyle = '#eeeeee'; ctx.font = 'bold 10px sans-serif'; ctx.fillText('N ↑', 8, 14);
     buildings.forEach((b) => {
       const [mx, mz] = toMap(b.x, b.z);
       const r = b.kind === "landmark" ? 3.5 : 2.2;
@@ -42,9 +46,11 @@ export function initMinimap(canvas, { xMin, xMax, zMin, zMax, buildings }) {
   }
 
   drawStatic();
+  const background = document.createElement('canvas'); background.width = background.height = size; background.getContext('2d').drawImage(canvas,0,0);
 
-  function update({ x, z, rotY, peers }) {
-    drawStatic();
+  function update({ x, z, rotY, peers, route = [] }) {
+    ctx.clearRect(0,0,size,size); ctx.drawImage(background,0,0);
+    if (route.length) { ctx.strokeStyle = '#ffd56a'; ctx.lineWidth = 2; ctx.beginPath(); route.forEach((p,i) => { const [x,z] = toMap(p.x,p.z); if (i) ctx.lineTo(x,z); else ctx.moveTo(x,z); }); ctx.stroke(); }
     if (peers) {
       ctx.fillStyle = "rgba(255,255,255,0.8)";
       peers.forEach((p) => {

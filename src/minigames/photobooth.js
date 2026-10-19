@@ -47,7 +47,7 @@ export function mountPhotoBooth(root, { onClose, capture, campusLabel = "UAPB" }
     const raw = capture();
     const framed = await compositeFrame(raw, campusLabel);
     const preview = root.querySelector("#pb-preview");
-    preview.innerHTML = `<img src="${framed}" style="max-width:100%;border-radius:8px;" />`;
+    preview.innerHTML = `<img src="${framed}" style="max-width:100%;border-radius:0;" />`;
     const dl = root.querySelector("#pb-download");
     dl.href = framed;
     dl.style.display = "block";

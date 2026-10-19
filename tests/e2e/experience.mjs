@@ -1,0 +1,57 @@
+import { createServer } from 'vite';
+import { chromium, devices } from 'playwright';
+import { mkdir } from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const server = await createServer({ server: { host: '127.0.0.1', port: 5197, strictPort: true }, logLevel: 'error' });
+await server.listen();
+const browser = await chromium.launch();
+await mkdir('docs/audit', { recursive: true });
+try {
+  for (const [name, options] of [['desktop', { viewport: { width: 1440, height: 900 } }], ['phone', devices['iPhone 14']], ['pixel', devices['Pixel 7']]]) {
+    const context = await browser.newContext(options); const page = await context.newPage(); const errors = [];
+    page.on('pageerror', e => errors.push(e.message));
+    await page.goto('http://127.0.0.1:5197');
+    await page.locator('#enter-yard').waitFor();
+    const radius = await page.locator('#enter-yard').evaluate((el) => getComputedStyle(el).borderRadius);
+    assert.equal(radius.replace(/ /g, ''), '0px');
+    await page.screenshot({ path: `docs/audit/${name}-landing.png` });
+    await page.locator('#enter-yard').click();
+    await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+    await page.getByRole('button', { name: 'Rotate camera left' }).click();
+    await page.getByRole('button', { name: 'Reset camera' }).click();
+    await page.locator('.yard-menu summary').click();
+    const oldNight = await page.locator('#night-toggle').textContent();
+    await page.locator('#night-toggle').click();
+    assert.notEqual(await page.locator('#night-toggle').textContent(), oldNight);
+    await page.locator('.yard-menu summary').click();
+    await page.locator('#character-button').click();
+    await page.locator('select[name="gender"]').selectOption('Nonbinary');
+    await page.locator('select[name="hair"]').selectOption('Locs');
+    await page.screenshot({ path: `docs/audit/${name}-character.png` });
+    await page.getByRole('button', { name: 'Save character' }).click();
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('yard-look-v1')).gender), 'Nonbinary');
+    await page.locator('#character-button').click();
+    assert.equal(await page.locator('select[name="hair"]').inputValue(), 'Locs');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('.character-editor').count(), 0);
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'character-button');
+    await page.getByRole('button', { name: 'Hide movement' }).click();
+    assert.equal(await page.locator('.joystick').isVisible(), false);
+    await page.getByRole('button', { name: 'Show movement' }).click();
+    const joystick = await page.locator('.joystick').boundingBox();
+    assert(joystick && joystick.x >= 0 && joystick.y >= 0);
+    await page.mouse.move(joystick.x + 60, joystick.y + 60); await page.mouse.down();
+    await page.mouse.move(joystick.x + 90, joystick.y + 35); await page.waitForTimeout(400); await page.mouse.up();
+    await page.locator('.yard-menu summary').click();
+    await page.locator('[data-modal="cards"]').click();
+    await page.locator('.modal').waitFor();
+    await page.locator('.modal .close').click();
+    await page.screenshot({ path: `docs/audit/${name}-yard.png` });
+    assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    assert.deepEqual(errors, []);
+    await page.reload(); await page.locator('#enter-yard').click(); await page.locator('#character-button').click();
+    assert.equal(await page.locator('select[name="gender"]').inputValue(), 'Nonbinary');
+    console.log(`${name}: entry, camera buttons, editor persistence, controls, game menu, overflow, runtime errors passed`);
+    await context.close();
+  }
+} finally { await browser.close(); await server.close(); }

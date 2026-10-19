@@ -8,15 +8,8 @@ export const CAMPUSES = {
   grambling: { meta: grambling.CAMPUS_META, data: grambling },
 };
 
-export function getActiveCampusId() {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored && CAMPUSES[stored]) return stored;
-  } catch {
-    /* storage unavailable */
-  }
-  return "uapb";
-}
+// UAPB is the only released campus until its acceptance gates pass.
+export function getActiveCampusId() { return "uapb"; }
 
 export function setActiveCampusId(id) {
   if (!CAMPUSES[id]) return;

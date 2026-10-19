@@ -32,7 +32,7 @@ function createCarMesh(color) {
     [0.55, 0.22, -0.75],
   ].forEach(([wx, wy, wz]) => {
     const wheel = new THREE.Mesh(wheelGeo, wheelMat);
-    wheel.rotation.x = Math.PI / 2;
+    wheel.rotation.z = Math.PI / 2;
     wheel.position.set(wx, wy, wz);
     group.add(wheel);
   });
@@ -126,4 +126,81 @@ export function createTraffic(scene, route, count = 4) {
   }
 
   return { cars, update };
+}
+
+// OSM centerlines replace the invented road loop. Roads and pedestrian paths
+// are separate surfaces, and vehicles never choose footway data.
+export function createMappedRoadNetwork(scene, roads) {
+  const surfaces = new Map();
+  function strip(a, b, width, y, color) {
+    const dx = b.x - a.x, dz = b.z - a.z, length = Math.hypot(dx, dz); if (length < .01) return;
+    const nx = -dz / length * width / 2, nz = dx / length * width / 2;
+    if (!surfaces.has(color)) surfaces.set(color, []);
+    const v = surfaces.get(color);
+    for (const p of [[a.x+nx,a.z+nz],[b.x+nx,b.z+nz],[a.x-nx,a.z-nz],[a.x-nx,a.z-nz],[b.x+nx,b.z+nz],[b.x-nx,b.z-nz]]) v.push(p[0], y, p[1]);
+  }
+  for (const road of roads) {
+    const path = ['footway','track'].includes(road.kind), width = path ? 1.25 : ['primary','tertiary'].includes(road.kind) ? 5.2 : 3.4;
+    for (let i = 1; i < road.points.length; i++) {
+      const a = road.points[i-1], b = road.points[i];
+      strip(a,b,width + (path ? .1 : .6),.025,path ? '#b9b7a9' : '#8d908b');
+      strip(a,b,width,.035,path ? '#c9c6b9' : '#484d4e');
+      if (!path && road.kind !== 'service') strip(a,b,.055,.045,'#d5be65');
+    }
+  }
+  const group = new THREE.Group();
+  surfaces.forEach((positions,color) => {
+    const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions,3)); geometry.computeVertexNormals();
+    const mesh = new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color,side:THREE.DoubleSide,roughness:1})); mesh.receiveShadow=true; mesh.userData.noCollision=true; group.add(mesh);
+  }); scene.add(group); return group;
+}
+
+export function createMappedTraffic(scene, roads) {
+  const choices = roads.filter(r => ['tertiary','residential','living_street'].includes(r.kind) && r.points.length > 2)
+    .map(r => ({...r, length:r.points.slice(1).reduce((n,p,i)=>n+Math.hypot(p.x-r.points[i].x,p.z-r.points[i].z),0)}))
+    .filter(r=>r.length>50).sort((a,b)=>b.length-a.length).slice(0,6);
+  function sample(road, distance, direction) {
+    let d=distance;
+    for(let i=1;i<road.points.length;i++) {
+      const a=road.points[i-1],b=road.points[i],length=Math.hypot(b.x-a.x,b.z-a.z);
+      if(d<=length || i===road.points.length-1) {
+        const t=Math.min(1,d/Math.max(length,.001)),angle=Math.atan2(b.x-a.x,b.z-a.z)+(direction<0?Math.PI:0);
+        return {x:a.x+(b.x-a.x)*t+Math.cos(angle)*.7,z:a.z+(b.z-a.z)*t-Math.sin(angle)*.7,angle};
+      } d-=length;
+    }
+  }
+  const cars=choices.map((road,i)=>{
+    const mesh=createCarMesh(CAR_COLORS[i%CAR_COLORS.length]);mesh.userData.dynamic=true;scene.add(mesh);
+    const dist=road.length*(.15+i*.1),p=sample(road,dist,1);mesh.position.set(p.x,0,p.z);mesh.rotation.y=p.angle;
+    return {mesh,road,dist,direction:1,speed:0,cruise:3.8+i*.15,previous:{x:p.x,z:p.z}};
+  });
+  let collisionWorld = null;
+  function update(dt,player) {
+    for(const car of cars) {
+      car.previous={x:car.mesh.position.x,z:car.mesh.position.z};
+      const angle=car.mesh.rotation.y,dx=(player?.x??1e6)-car.mesh.position.x,dz=(player?.z??1e6)-car.mesh.position.z;
+      const ahead=dx*Math.sin(angle)+dz*Math.cos(angle),side=Math.abs(dx*Math.cos(angle)-dz*Math.sin(angle));
+      const lookAhead = sample(car.road, THREE.MathUtils.clamp(car.dist + car.direction * 4, 0, car.road.length), car.direction);
+      const blocked = collisionWorld && !collisionWorld.clear(lookAhead.x, lookAhead.z, 1.3);
+      const braking=blocked || (player && ahead>0 && ahead<7 && side<1.5);
+      const target=braking?0:car.cruise;
+      car.speed=THREE.MathUtils.damp(car.speed,target,braking?8:2,dt);
+      const proposed = car.dist+car.speed*dt*car.direction;
+      const candidate = sample(car.road, THREE.MathUtils.clamp(proposed, 0, car.road.length), car.direction);
+      if (!collisionWorld || collisionWorld.clear(candidate.x, candidate.z, 1.3)) car.dist=proposed;
+      else car.speed=0;
+      if(car.dist>car.road.length){car.dist=car.road.length;car.direction=-1;car.speed=0;}
+      if(car.dist<0){car.dist=0;car.direction=1;car.speed=0;}
+      const p=sample(car.road,car.dist,car.direction);car.mesh.position.set(p.x,0,p.z);car.mesh.rotation.y=p.angle;
+    }
+  }
+  function setWorld(world) {
+    collisionWorld=world;
+    // Keep vehicles out of props or buildings even when an OSM centerline is incomplete.
+    for (const car of cars) for (let d=car.dist, n=0; n<Math.ceil(car.road.length); n++, d=(d+1)%car.road.length) {
+      const p=sample(car.road,d,car.direction);
+      if(world.clear(p.x,p.z,1.3)){car.dist=d;car.mesh.position.set(p.x,0,p.z);car.previous={x:p.x,z:p.z};break;}
+    }
+  }
+  return {cars,update,setWorld,colliders:()=>cars.map(c=>({x:c.mesh.position.x,z:c.mesh.position.z,w:1.1,d:2.3,angle:c.mesh.rotation.y}))};
 }

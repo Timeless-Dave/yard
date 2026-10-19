@@ -33,8 +33,8 @@ async function join(browser, name) {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(URL);
-  await page.locator('text="Let\'s go!"').click({ timeout: 20000 });
-  await page.locator('[data-modal="auth"]').first().click();
+  await page.locator('#enter-yard').click({ timeout: 20000 });
+  await page.locator('.topbar .btn-secondary[data-modal="auth"]').click();
   await page.fill("#am-name", name);
   await page.click("#am-join");
   await page.locator("#am-join").waitFor({ state: "detached", timeout: 20000 });
@@ -42,6 +42,7 @@ async function join(browser, name) {
 }
 
 async function openModal(page, key) {
+  await page.locator(".yard-menu").evaluate(el => { el.open = true; });
   await page.locator(`[data-modal="${key}"]`).first().click();
 }
 async function closeModal(page) {
@@ -65,8 +66,8 @@ try {
   });
 
   await check("signed-in UI shows the player's own name instead of Sign up / Log in", async () => {
-    await alice.page.locator('.bottom-card [data-modal="auth"]', { hasText: "👤 Alice" }).waitFor({ timeout: 20000 });
-    const signUpVisible = await alice.page.locator('.bottom-card [data-modal="auth"]', { hasText: "Sign up" }).isVisible();
+    await alice.page.locator('.topbar .auth-row .btn-secondary[data-modal="auth"]', { hasText: "👤 Alice" }).waitFor({ timeout: 20000 });
+    const signUpVisible = await alice.page.locator('.topbar [data-modal="auth"]', { hasText: "Sign up" }).isVisible();
     if (signUpVisible) throw new Error("Sign up still showing for a signed-in player");
   });
 

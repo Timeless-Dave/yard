@@ -11,11 +11,13 @@
     "test": "vitest run tests/unit",
     "test:emulator": "DATABASE_URL=https://demo-yard-default-rtdb.firebaseio.com firebase emulators:exec --only auth,firestore,database,functions --project demo-yard \"vitest run tests/emulator --testTimeout=60000 --hookTimeout=60000\"",
     "test:e2e": "DATABASE_URL=https://demo-yard-default-rtdb.firebaseio.com firebase emulators:exec --only auth,firestore,database,functions --project demo-yard \"node tests/e2e/multiplayer.mjs\"",
-    "test:mobile": "node tests/e2e/mobile.mjs",
-    "test:all": "npm test && npm run test:emulator && npm run test:e2e && npm run test:mobile",
+    "test:mobile": "node tests/e2e/experience.mjs",
+    "test:all": "npm test && npm run test:emulator && npm run test:e2e && npm run test:mobile && npm run test:world",
     "seed:store": "node scripts/seedStoreItems.mjs",
     "set-admin": "node scripts/setAdmin.mjs",
-    "test:live": "node tests/e2e/live-smoke.mjs https://timeless-dave.github.io/yard/"
+    "test:live": "node tests/e2e/live-smoke.mjs https://timeless-dave.github.io/yard/",
+    "test:world": "node tests/e2e/world.mjs",
+    "import:map": "python3 scripts/importUapbMap.py"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^6.0.0",

@@ -15,6 +15,11 @@
 //   base with a flat white overhanging canopy roof and a glass entrance
 //   framed by four tall white columns, banner signage between them.
 import * as THREE from "three";
+import { doorwayPolygon } from "./worldPhysics.js";
+
+function collideWithDoor(mesh, x, z, w, d, door) {
+  mesh.userData.collider = { x, z, w, d, polygon: doorwayPolygon({ x, z, w, d, door }) };
+}
 
 function canvasTexture(draw, w = 256, h = 256) {
   const c = document.createElement("canvas");
@@ -220,7 +225,21 @@ export function createBellTower(scene, x, z) {
   const s1 = stage(3.0, 5.5, 3.0, { withArch: true });
   s1.position.y = y + 2.75;
   y += 5.5;
+  // Base stage is modeled visually as a solid block but physically as two
+  // brick piers framing a walk-through arch along the local z axis. The
+  // auto-AABB collector would otherwise seal the arch, so skip this mesh and
+  // add explicit pier colliders beside it.
+  s1.userData.noCollision = true;
   group.add(s1);
+  for (const shape of bellTowerColliders(x, z)) {
+    const pier = new THREE.Mesh(
+      new THREE.BoxGeometry(shape.w, 5.5, shape.d),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    pier.position.set(shape.x - x, 2.75, shape.z - z);
+    pier.userData.collider = shape;
+    group.add(pier);
+  }
 
   const b1 = band(3.3, 3.3);
   b1.position.y = y + 0.18;
@@ -337,6 +356,7 @@ export function createAcademicHall(scene, { x, z, w, h, d, label, brick = "#7a2e
   }
 
   group.position.set(x, 0, z);
+  collideWithDoor(body, x, z, w, d);
   scene.add(group);
   return group;
 }
@@ -366,7 +386,7 @@ export function createCaldwellHall(scene, { x, z, w, h, d, label }) {
   );
   panel.position.set(0, h * 0.72, d / 2 + d * 0.45 + 0.02);
   group.add(panel);
-  const panelDetail = labelPlane("UAPB · 1928", w * 0.18, 0.6, "#e8e2d0", "#2a2a2a");
+  const panelDetail = labelPlane("UAPB 1928", w * 0.18, 0.6, "#e8e2d0", "#2a2a2a");
   panelDetail.position.set(0, h * 0.72, d / 2 + d * 0.45 + 0.1);
   group.add(panelDetail);
 
@@ -377,6 +397,9 @@ export function createCaldwellHall(scene, { x, z, w, h, d, label }) {
   }
 
   group.position.set(x, 0, z);
+  const hall = group.children.find((child) => child.isMesh);
+  if (hall) hall.userData.collider = { x, z, w, d };
+  collideWithDoor(wing, x, z + d / 2 + (d * 0.45) / 2 - 0.1, w * 0.35, d * 0.45);
   return group;
 }
 
@@ -432,6 +455,7 @@ export function createModernHall(scene, { x, z, w, h, d, label, color = "#3a5c8a
   }
 
   group.position.set(x, 0, z);
+  collideWithDoor(body, x, z, w, d);
   scene.add(group);
   return group;
 }
@@ -480,6 +504,7 @@ export function createStudentUnion(scene, { x, z, w, h, d, label }) {
   );
   cap.position.set(0, baseH + capH / 2, -d * 0.06);
   cap.castShadow = true;
+  cap.userData.noCollision = true;
   group.add(cap);
 
   // dark underside reveal on the cantilever, like the real overhang
@@ -506,6 +531,7 @@ export function createStudentUnion(scene, { x, z, w, h, d, label }) {
   }
 
   group.position.set(x, 0, z);
+  collideWithDoor(base, x, z, w * 0.82, d * 0.82, Math.min(4.2, w * 0.28));
   scene.add(group);
   return group;
 }
@@ -518,7 +544,7 @@ export function createLibrary(scene, { x, z, w, h, d, label }) {
 
   const body = new THREE.Mesh(
     new THREE.BoxGeometry(w, h, d),
-    new THREE.MeshStandardMaterial({ color: brick })
+    new THREE.MeshStandardMaterial({ map: brickTexture({ brick, rows: 28, cols: 32 }) })
   );
   body.position.y = h / 2;
   body.castShadow = true;
@@ -531,6 +557,7 @@ export function createLibrary(scene, { x, z, w, h, d, label }) {
     new THREE.MeshStandardMaterial({ color: cream })
   );
   canopy.position.y = h + 0.15;
+  canopy.userData.noCollision = true;
   group.add(canopy);
 
   // glass entrance
@@ -548,17 +575,17 @@ export function createLibrary(scene, { x, z, w, h, d, label }) {
     }
   }, 256, 160);
   const glass = new THREE.Mesh(
-    new THREE.PlaneGeometry(w * 0.55, h * 0.6),
+    new THREE.PlaneGeometry(w * 0.68, h * 0.88),
     new THREE.MeshStandardMaterial({ map: glassTex })
   );
-  glass.position.set(0, h * 0.4, d / 2 + 0.02);
+  glass.position.set(0, h * 0.46, d / 2 + 0.02);
   group.add(glass);
 
   // four white entrance columns
   for (let i = 0; i < 4; i++) {
     const cx = -w * 0.3 + (w * 0.6 * i) / 3;
     const col = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.18, 0.18, h * 0.85, 10),
+      new THREE.BoxGeometry(.45, h * .95, .45),
       new THREE.MeshStandardMaterial({ color: cream })
     );
     col.position.set(cx, (h * 0.85) / 2, d / 2 + 0.6);
@@ -573,6 +600,7 @@ export function createLibrary(scene, { x, z, w, h, d, label }) {
   }
 
   group.position.set(x, 0, z);
+  collideWithDoor(body, x, z, w, d, Math.min(3.6, w * 0.28));
   scene.add(group);
   return group;
 }
@@ -643,6 +671,7 @@ export function createDormHall(scene, { x, z, w, h, d, label, color = "#6b4423" 
   }
 
   group.position.set(x, 0, z);
+  collideWithDoor(body, x, z, w, d);
   scene.add(group);
   return group;
 }
@@ -703,6 +732,7 @@ export function createGymComplex(scene, { x, z, w, h, d, label, color = "#2d6b4a
   }
 
   group.position.set(x, 0, z);
+  collideWithDoor(body, x, z, w, d);
   scene.add(group);
   return group;
 }
@@ -751,6 +781,7 @@ export function createFineArtsCenter(scene, { x, z, w, h, d, label, color = "#7a
   }
 
   group.position.set(x, 0, z);
+  collideWithDoor(body, x, z, w, d);
   scene.add(group);
   return group;
 }
@@ -786,6 +817,7 @@ export function createSTEMBuilding(scene, { x, z, w, h, d, label, color = "#2d6b
     new THREE.MeshStandardMaterial({ color: cream })
   );
   poolEdge.position.set(0, -0.01, d / 2 + d * 0.3);
+  poolEdge.userData.noCollision = true;
   group.add(poolEdge);
 
   if (label) {
@@ -795,6 +827,7 @@ export function createSTEMBuilding(scene, { x, z, w, h, d, label, color = "#2d6b
   }
 
   group.position.set(x, 0, z);
+  collideWithDoor(body, x, z, w, d);
   scene.add(group);
   return group;
 }
@@ -836,6 +869,7 @@ export function createStadiumComplex(scene, x, z) {
   field.rotation.x = -Math.PI / 2;
   field.position.set(0, 0.02, 0);
   field.receiveShadow = true;
+  field.userData.noCollision = true; // play surface stays walkable
   group.add(field);
 
   function grandstand(tiers, tierDepth, tierHeight, width, gx, gz, rotY) {
@@ -868,6 +902,19 @@ export function createStadiumComplex(scene, x, z) {
 
   // Away stands (smaller)
   grandstand(3, 1.3, 1, 26, 0, 10.5, Math.PI);
+
+  // Explicit stand/press-box colliders. Upper tiers and the elevated press
+  // box would otherwise slip past the auto-AABB height threshold, letting the
+  // player clip into the structure from behind the first row.
+  for (const shape of stadiumColliders(x, z)) {
+    const marker = new THREE.Mesh(
+      new THREE.BoxGeometry(shape.w, 1, shape.d),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    marker.position.set(shape.x - x, 0.5, shape.z - z);
+    marker.userData.collider = shape;
+    group.add(marker);
+  }
 
   // Scoreboard at one end
   const board = new THREE.Mesh(
@@ -903,4 +950,56 @@ export function createStadiumComplex(scene, x, z) {
   group.position.set(x, 0, z);
   scene.add(group);
   return group;
+}
+
+// Unverified architectural details stay simple, but the massing follows the
+// pinned OSM polygon instead of shrinking each building into an arbitrary box.
+export function createFootprintBuilding(scene, building) {
+  const { x, z, h, footprint, name } = building;
+  const shape = new THREE.Shape();
+  footprint.forEach((p,i) => { if (i) shape.lineTo(p.x-x,-(p.z-z)); else shape.moveTo(p.x-x,-(p.z-z)); });
+  const geometry = new THREE.ExtrudeGeometry(shape,{depth:h,bevelEnabled:false}); geometry.rotateX(-Math.PI/2);
+  const brick=brickTexture({brick:'#865448',rows:18,cols:20});
+  const group=new THREE.Group(),body=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({map:brick,roughness:.95}));body.castShadow=true;body.receiveShadow=true;body.userData.collider={x,z,w:building.w,d:building.d,polygon:footprint};group.add(body);
+  const glass=new THREE.MeshStandardMaterial({color:'#4e6972',roughness:.28});
+  const cream=new THREE.MeshStandardMaterial({color:'#ded8c9'});
+  for(let i=1;i<footprint.length;i++){
+    const a=footprint[i-1],b=footprint[i],dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz),angle=Math.atan2(dx,dz);
+    if(length<2)continue;
+    const band=new THREE.Mesh(new THREE.BoxGeometry(.15,.2,length),cream);band.rotation.y=angle;band.position.set((a.x+b.x)/2-x,h-.2,(a.z+b.z)/2-z);group.add(band);
+    for(let t=1;t<length-1;t+=2.5)for(let y=1.8;y<h-.7;y+=2.6){
+      const window=new THREE.Mesh(new THREE.BoxGeometry(.12,1.3,1.2),glass);window.rotation.y=angle;window.position.set(a.x+dx*t/length-x,y,a.z+dz*t/length-z);group.add(window);
+    }
+  }
+  const sign=labelPlane(name,Math.min(building.w*.7,7),.9);sign.position.set(0,2.7,building.d/2+.08);group.add(sign);
+  group.position.set(x,0,z);scene.add(group);return group;
+}
+
+// ---- Collider helpers (exported for unit tests and reuse) ----
+// Bell tower base is physically two brick piers framing a walk-through arch
+// along the local z axis. These shapes are world-space AABBs matching the
+// pier footprints; the gap between them is the arch opening (~1.2m wide).
+export function bellTowerColliders(cx, cz) {
+  const pierW = 0.9, pierD = 3.0, offset = 1.05; // 0.6m half-arch + 0.45 pier half-width
+  return [
+    { x: cx - offset, z: cz, w: pierW, d: pierD },
+    { x: cx + offset, z: cz, w: pierW, d: pierD },
+  ];
+}
+
+// Stadium colliders: home grandstand (4 tiers deep), away grandstand (3
+// tiers), and the elevated press box behind the home top tier. The field
+// surface itself is intentionally omitted so players can walk onto it.
+export function stadiumColliders(cx, cz) {
+  // Home: 4 tiers of depth 1.1 stepped back by 0.9 * depth each row.
+  const homeDepth = 1.1 + 3 * 1.1 * 0.9; // 4.07
+  const homeCenterOffset = (1.1 * 0.9) * 3 / 2; // 1.485 from the front edge
+  // Away: 3 tiers of depth 1.0, rotated 180 so the step is toward +z.
+  const awayDepth = 1.0 + 2 * 1.0 * 0.9; // 2.8
+  const awayCenterOffset = (1.0 * 0.9) * 2 / 2; // 0.9
+  return [
+    { x: cx, z: cz - 10.5 - homeCenterOffset, w: 30, d: homeDepth },
+    { x: cx, z: cz + 10.5 + awayCenterOffset, w: 26, d: awayDepth },
+    { x: cx, z: cz - 13.7, w: 10, d: 2.2 }, // press box
+  ];
 }

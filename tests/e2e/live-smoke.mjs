@@ -39,17 +39,18 @@ for (const [label, options] of [
   await check("loads and shows onboarding", async () => {
     const res = await page.goto(URL, { waitUntil: "load" });
     if (!res.ok()) throw new Error(`HTTP ${res.status()}`);
-    await page.locator('text="Let\'s go!"').waitFor({ timeout: 20000 });
+    await page.locator('#enter-yard').waitFor({ timeout: 20000 });
   });
   await check("every asset loads (no 4xx/5xx — base path is right)", async () => {
     if (failedRequests.length) throw new Error(failedRequests.join(", "));
   });
   await check("3D scene renders into a canvas", async () => {
-    await page.locator('text="Let\'s go!"').click();
+    await page.locator('#enter-yard').click();
     const size = await page.locator("canvas").first().boundingBox();
     if (!size || size.width < 300) throw new Error("no rendered canvas");
   });
   await check("a minigame opens", async () => {
+    await page.locator('.yard-menu summary').click();
     await page.locator('[data-modal="achievements"]').first().click();
     await page.locator(".modal", { hasText: "Homecoming Checklist" }).waitFor({ timeout: 10000 });
     await page.screenshot({ path: `${SHOTS}/${label.replace(/\s+/g, "-").toLowerCase()}.png` });

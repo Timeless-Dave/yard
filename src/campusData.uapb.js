@@ -1,9 +1,10 @@
+import map from "./uapbMap.generated.json";
 // Real UAPB building positions sourced from OpenStreetMap (Overpass API),
 // projected to local meters around the W.E. O'Bryant Bell Tower and scaled
 // 0.35x for a walkable world. Footprints are stylized approximations, not
 // true building outlines. `special` tags route to a detailed model in
 // src/buildings.js; see that file's comments for what each is built from.
-export const BUILDINGS = [
+const ORIGINAL_BUILDINGS = [
   { name: "W.E. O'Bryant Bell Tower", kind: "landmark", special: "bell_tower", color: "#f4b223", x: 0.0, z: 0.0, w: 1.7, h: 11, d: 1.7 },
   { name: "Golden Lion Stadium", kind: "athletics", special: "stadium", color: "#0a5c2b", x: -31.0, z: -428.9, w: 22.0, h: 11, d: 12.1 },
   { name: "L.A. Davis, Sr. Student Union", kind: "student_life", special: "union_cantilever", color: "#f4b223", x: -60.1, z: -21.7, w: 11.0, h: 7, d: 8.8 },
@@ -28,6 +29,19 @@ export const BUILDINGS = [
   { name: "Corbin Hall", kind: "academic", color: "#3a5c8a", x: -11.8, z: 60.2, w: 7.2, h: 6, d: 5.5 },
 ];
 
+// Center and footprint sizes now come from the pinned, reproducible OSM import.
+const aliases = { 'John Brown Watson Memorial Library': 'John B. Watson Library', 'Kenneth L. Johnson HPER Complex': 'Health, Physical Education and Recreation (HPER) Building' };
+const matchedBuildings = ORIGINAL_BUILDINGS.map(b => {
+  const measured = map.buildings.find(m => m.name === (aliases[b.name] || b.name));
+  return measured ? { ...b, ...measured, name: b.name === 'Woodward Hall' ? 'Woodard Hall' : b.name, h: b.h } : b;
+});
+// Add named campus structures missing from the prototype; exclude neighboring churches.
+const usedIds = new Set(matchedBuildings.map(b => b.osmId));
+const additional = map.buildings.filter(b => !usedIds.has(b.osmId) && !/church/i.test(b.name)).map(b => ({ ...b, kind: 'academic', h: 5, color: '#865448', modelConfidence: 'OSM footprint; height and facade approximate' }));
+export const BUILDINGS = [...matchedBuildings, ...additional];
+export const MAP_ROADS = map.roads;
+export const MAP_METADATA = { origin: map.origin, scale: map.scale, retrieved: map.retrieved };
+
 // Real coordinates (sport-tagged OSM ways), same projection.
 export const REAL_RECREATION = [
   { name: "Tennis Courts", x: -156.5, z: -193.6, w: 14, d: 7, sport: "tennis" },
@@ -38,10 +52,10 @@ export const REAL_RECREATION = [
 // spots) — placed just outside the Student Union / near HPER as a
 // reasonable stand-in for "the food court" and "the rec fields."
 export const RETAIL_NEAR_UNION = [
-  { name: "Starbucks", icon: "☕", x: -72, z: -14, color: "#00704a" },
-  { name: "Chick-fil-A", icon: "🐔", x: -72, z: -30, color: "#dd0033" },
-  { name: "Golden Lion Bookstore", icon: "📚", x: -48, z: -30, color: "#2a2a2a" },
-  { name: "The Cafeteria", icon: "🍽️", x: -48, z: -14, color: "#8a3b2b" },
+  { name: "Starbucks", icon: "☕", x: -72, z: -12, color: "#00704a" },
+  { name: "Chick-fil-A", icon: "🐔", x: -73.4, z: -31.4, color: "#dd0033" },
+  { name: "Golden Lion Bookstore", icon: "📚", x: -49.4, z: -31.4, color: "#2a2a2a" },
+  { name: "The Cafeteria", icon: "🍽️", x: -48, z: -12, color: "#8a3b2b" },
 ];
 
 export const FICTIONAL_RECREATION = [
@@ -50,17 +64,32 @@ export const FICTIONAL_RECREATION = [
 ];
 
 export const VENDING_SPOTS = [
-  [-66, -20],
-  [-96, 12],
-  [-121, -142],
+  [-66, -12],
+  [-88, 12],
+  [-121, -128],
 ];
 
 export const PARTY_SPOTS = {
   bell_tower_yard: { label: "The Yard (Bell Tower)", x: 10, z: -10 },
-  union_courtyard: { label: "Student Union Courtyard", x: -68, z: -30 },
-  dorm_block: { label: "Dorm Block (Harrold)", x: -92, z: 18 },
+  union_courtyard: { label: "Student Union Courtyard", x: -69.4, z: -31.4 },
+  dorm_block: { label: "Dorm Block (Harrold)", x: -88, z: 18 },
   stadium_lot: { label: "Stadium Lot", x: -24, z: -418 },
 };
+export const ACTIVITY_SPOTS = {
+  cards: { x: 5, z: 5, label: "Bell Tower Lawn", confidence: "lawn" },
+  stepshow: { x: 5, z: -5, label: "Bell Tower Plaza", confidence: "plaza" },
+  dominoes: { x: -5, z: 5, label: "Bell Tower West", confidence: "lawn" },
+  doubledutch: { x: -5, z: -5, label: "Bell Tower North", confidence: "plaza" },
+  hopscotch: { x: -10, z: 0, label: "Bell Tower Walk", confidence: "plaza" },
+  boombox: { x: 0, z: 10, label: "Caldwell Lawn", confidence: "lawn" },
+  pager: { x: 10, z: 5, label: "East Lawn", confidence: "lawn" },
+  cookout: { x: -45, z: -10, label: "Union East Plaza", confidence: "plaza" },
+  photobooth: { x: -75, z: -10, label: "Union West Walk", confidence: "plaza" },
+  king: { x: -45, z: -35, label: "Union South Lawn", confidence: "lawn" },
+  billboards: { x: -75, z: -35, label: "Union Courtyard", confidence: "plaza" },
+  community: { x: -60, z: -5, label: "Union North Walk", confidence: "plaza" }
+};
+
 
 // Approximate campus loop road, threading the Bell Tower, Student Union,
 // HPER, and Administration — for ambient car traffic. Not surveyed, just a
