@@ -3,6 +3,8 @@ import { getAuth, connectAuthEmulator } from "firebase/auth";
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getDatabase, connectDatabaseEmulator } from "firebase/database";
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
+import { ONLINE } from "./onlineConfig.js";
+export { ONLINE };
 
 // VITE_USE_EMULATORS=true points the app at the local Firebase emulator
 // suite (see `npm run test:e2e`) instead of a real project.
@@ -25,8 +27,6 @@ const firebaseConfig = USE_EMULATORS
       appId: import.meta.env.VITE_FIREBASE_APP_ID,
       databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
     };
-
-export const ONLINE = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
 
 const app = ONLINE ? getApps()[0] ?? initializeApp(firebaseConfig) : null;
 

@@ -1,5 +1,5 @@
 import { spendCoins, getBalance } from "../economy.js";
-import { ONLINE } from "../firebase.js";
+import { ONLINE } from "../onlineConfig.js";
 
 const SNACKS = [
   { name: "Flamin' Hots 🔥", price: 5 },

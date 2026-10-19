@@ -9,6 +9,7 @@
         "x": { ".validate": "newData.isNumber()" },
         "z": { ".validate": "newData.isNumber()" },
         "rotY": { ".validate": "newData.isNumber()" },
+        "room": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 64" },
         "updatedAt": { ".validate": "newData.isNumber()" },
         "$other": { ".validate": false }
       }

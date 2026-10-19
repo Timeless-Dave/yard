@@ -3,6 +3,19 @@ import { rtdb, ONLINE } from "./firebase.js";
 
 let myKey = null;
 let myIdentity = { name: "Golden Lion", color: "#f4b223" };
+let myRoom = "exterior";
+const ROOM_MAX = 64;
+
+export function currentRoomId() {
+  return myRoom;
+}
+
+export function setMyRoom(room) {
+  const next = String(room || "exterior").slice(0, ROOM_MAX);
+  myRoom = next || "exterior";
+  if (!ONLINE || !myKey) return;
+  update(ref(rtdb, `presence/${myKey}`), { room: myRoom, updatedAt: Date.now() });
+}
 let unsubscribers = [];
 const peers = new Map(); // key -> { x, z, rotY, name, color }
 const listeners = new Set();
@@ -41,7 +54,7 @@ export async function joinPresence(userId, profile) {
   const offConnected = onValue(connectedRef, (snap) => {
     if (snap.val() === true) {
       onDisconnect(myRef).remove();
-      set(myRef, { ...myIdentity, x: 0, z: 10, rotY: 0, updatedAt: Date.now() });
+      set(myRef, { ...myIdentity, x: 0, z: 10, rotY: 0, room: myRoom, updatedAt: Date.now() });
     }
   });
   unsubscribers.push(offConnected);
@@ -67,7 +80,7 @@ export function updateMyPosition(x, z, rotY) {
   const now = performance.now();
   if (now - lastSent < 120) return; // throttle broadcasts
   lastSent = now;
-  update(ref(rtdb, `presence/${myKey}`), { x, z, rotY, updatedAt: Date.now() });
+  update(ref(rtdb, `presence/${myKey}`), { x, z, rotY, room: myRoom, updatedAt: Date.now() });
 }
 
 export function setMyIdentity(name, color) {

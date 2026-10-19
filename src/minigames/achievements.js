@@ -1,5 +1,5 @@
 import { ACHIEVEMENTS, getUnlocked, onAchievementsChange } from "../achievements.js";
-import { ONLINE } from "../firebase.js";
+import { ONLINE } from "../onlineConfig.js";
 
 export function mountAchievements(root, { onClose } = {}) {
   root.innerHTML = `

@@ -1,4 +1,4 @@
-import { ONLINE } from "./firebase.js";
+import { ONLINE } from "./onlineConfig.js";
 import {
   quickJoin,
   signInWithGoogle,

@@ -1,6 +1,4 @@
-import { collection, doc, getDocs, setDoc, serverTimestamp } from "firebase/firestore";
-import { db, ONLINE } from "./firebase.js";
-import { getState, onAuthChange } from "./auth.js";
+import { ONLINE } from "./onlineConfig.js";
 import { earnCoins } from "./economy.js";
 import { playSuccess } from "./sound.js";
 
@@ -63,6 +61,8 @@ export function getUnlocked() {
 // Records an unlock server-side and claims its one-time coin bonus (the
 // server refuses a second claim, so retrying is harmless).
 async function recordOnServer(user, id) {
+  const { db } = await import("./firebase.js");
+  const { doc, setDoc, serverTimestamp } = await import("firebase/firestore");
   try {
     await setDoc(doc(db, "achievementProgress", user.uid, "unlocked", id), { earnedAt: serverTimestamp() });
   } catch {
@@ -71,9 +71,9 @@ async function recordOnServer(user, id) {
   await earnCoins("achievement", { achievementId: id });
 }
 
-// Two-way sync on sign-in: pull what the server knows, then push anything
-// unlocked while offline or signed out.
 async function syncWithServer(user) {
+  const { db } = await import("./firebase.js");
+  const { collection, getDocs } = await import("firebase/firestore");
   const snap = await getDocs(collection(db, "achievementProgress", user.uid, "unlocked"));
   const onServer = new Set(snap.docs.map((d) => d.id));
   onServer.forEach((id) => unlocked.add(id));
@@ -85,13 +85,16 @@ async function syncWithServer(user) {
 }
 
 let syncedUid = null;
-if (ONLINE) {
-  onAuthChange(({ user }) => {
-    if (user && user.uid !== syncedUid) {
-      syncedUid = user.uid;
-      syncWithServer(user).catch((e) => console.warn("[The Yard] achievement sync failed:", e.message));
-    }
-    if (!user) syncedUid = null;
+export function startAchievementSync() {
+  if (!ONLINE) return;
+  import("./auth.js").then(({ onAuthChange }) => {
+    onAuthChange(({ user }) => {
+      if (user && user.uid !== syncedUid) {
+        syncedUid = user.uid;
+        syncWithServer(user).catch((e) => console.warn("[The Yard] achievement sync failed:", e.message));
+      }
+      if (!user) syncedUid = null;
+    });
   });
 }
 
@@ -120,6 +123,8 @@ export async function unlockAchievement(id) {
   playSuccess();
   showToast(achievement);
 
+  if (!ONLINE) return;
+  const { getState } = await import("./auth.js");
   const { user } = getState();
-  if (ONLINE && user) await recordOnServer(user, id);
+  if (user) await recordOnServer(user, id);
 }

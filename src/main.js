@@ -14,17 +14,8 @@ import { mountStepShow } from "./minigames/stepshow.js";
 import { mountDominoes } from "./minigames/dominoes.js";
 import { mountPager } from "./minigames/pager.js";
 import { mountCookout } from "./minigames/cookout.js";
-import { mountCommunity } from "./minigames/community.js";
-import { mountPlotClaim } from "./minigames/plotClaim.js";
-import { mountLeaderboard } from "./minigames/leaderboard.js";
-import { mountVoting } from "./minigames/voting.js";
-import { mountStore } from "./minigames/store.js";
 import { isHalloween, isPrettyWednesday } from "./seasonal.js";
-import { mountParties } from "./minigames/parties.js";
-import { mountVending } from "./minigames/vending.js";
-import { mountChat } from "./minigames/chat.js";
 import { mountLionsDen } from "./minigames/lionsden.js";
-import { mountModQueue } from "./minigames/modqueue.js";
 import { mountGuidelines } from "./minigames/guidelines.js";
 import { startWeatherLoop, onWeatherChange, setWeatherLocation } from "./weather.js";
 import { getActiveCampus } from "./campuses.js";
@@ -43,13 +34,8 @@ import { initMinimap } from "./minimap.js";
 import { playOpen, playClose, playClick, isMuted, toggleMuted } from "./sound.js";
 import { mountAchievements } from "./minigames/achievements.js";
 import { mountOnboarding } from "./minigames/onboarding.js";
-import { unlockAchievement } from "./achievements.js";
-import { mountAuthModal } from "./authModal.js";
-import { onAuthChange } from "./auth.js";
-import { db, ONLINE } from "./firebase.js";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
-import { joinPresence, leavePresence, updateMyPosition, setMyIdentity, onPeersChange } from "./multiplayer.js";
-import { watchWallet, stopWatchingWallet, onBalanceChange } from "./economy.js";
+import { unlockAchievement, startAchievementSync } from "./achievements.js";
+import { ONLINE } from "./onlineConfig.js";
 
 // ---- Active campus (switchable via the 🏫 Campus chip; see src/campuses.js) ----
 const ACTIVE_CAMPUS = getActiveCampus();
@@ -942,6 +928,7 @@ function enterBuilding(building, level = 0) {
   if (!currentRoom) { exteriorPosition = avatar.position.clone(); exteriorCamera = { zoom: view.zoom, yaw: view.yaw }; scene.remove(avatar); }
   else { currentRoom.scene.remove(avatar); currentRoom.dispose(); }
   currentRoom = createInterior(building, level); roomBuilding = building;
+  publishRoom(roomKey(building, level));
   avatar.position.set(currentRoom.spawn.x, 0, currentRoom.spawn.z); avatar.rotation.set(0, Math.PI, 0); currentRoom.scene.add(avatar);
   view.yaw = 0; view.zoom = 1.1; view.damp(10); hitTime = 0;
   const indoor = view.offsetFor(true);
@@ -952,6 +939,7 @@ function enterBuilding(building, level = 0) {
 function exitBuilding() {
   if (!currentRoom) return;
   clearInput(); currentRoom.scene.remove(avatar); currentRoom.dispose(); currentRoom = null; roomBuilding = null;
+  publishRoom("exterior");
   scene.add(avatar); avatar.position.copy(exteriorPosition); exteriorPosition = null;
   view.zoom = exteriorCamera.zoom; view.yaw = exteriorCamera.yaw; view.damp(10); impactCooldown = 1.5;
   const outdoor = view.offsetFor(false);
@@ -983,7 +971,7 @@ renderer.domElement.addEventListener('wheel', e => {
   e.preventDefault(); changeZoom(Math.sign(e.deltaY) * .08);
 }, { passive: false });
 mountExperience({ online: ONLINE,
-  onEnter: () => { enteredYard = true; },
+  onEnter: () => { enteredYard = true; startOnline(); },
   onCustomize: () => openModal('character'),
   onNavigate: () => { if (currentRoom) announceWorld('Exit the building to plan a campus route.'); else openModal('destinations'); },
   onRecover: recoverPosition,
@@ -1048,16 +1036,8 @@ const MINIGAMES = {
   dominoes: mountDominoes,
   pager: mountPager,
   cookout: mountCookout,
-  community: mountCommunity,
-  chat: mountChat,
   lionsden: mountLionsDen,
-  modqueue: mountModQueue,
   guidelines: mountGuidelines,
-  leaderboard: mountLeaderboard,
-  king: mountVoting,
-  store: mountStore,
-  parties: mountParties,
-  vending: mountVending,
   achievements: mountAchievements,
   onboarding: mountOnboarding,
   band: mountBand,
@@ -1069,14 +1049,20 @@ const MINIGAMES = {
       ...opts,
       campusLabel: CAMPUS_META.shortName,
       capture: () => {
-        // The renderer isn't created with preserveDrawingBuffer (that costs
-        // perf every frame), so re-render synchronously right before
-        // reading pixels — otherwise toDataURL() reads an already-cleared
-        // buffer and comes back blank.
         renderer.render(activeScene(), camera);
         return renderer.domElement.toDataURL("image/png");
       },
     }),
+};
+const ONLINE_GAMES = {
+  community: () => import("./minigames/community.js").then((m) => m.mountCommunity),
+  chat: () => import("./minigames/chat.js").then((m) => m.mountChat),
+  modqueue: () => import("./minigames/modqueue.js").then((m) => m.mountModQueue),
+  leaderboard: () => import("./minigames/leaderboard.js").then((m) => m.mountLeaderboard),
+  king: () => import("./minigames/voting.js").then((m) => m.mountVoting),
+  store: () => import("./minigames/store.js").then((m) => m.mountStore),
+  parties: () => import("./minigames/parties.js").then((m) => m.mountParties),
+  vending: () => import("./minigames/vending.js").then((m) => m.mountVending),
 };
 
 // Modals with live Firestore listeners return a cleanup function; it runs on
@@ -1140,11 +1126,33 @@ function openModal(key, zoneNote) {
     return;
   }
   if (key === "plots") {
-    mountInBackdrop((root) => mountPlotClaim(root, { letters: zoneNote, onClose: closeModal }));
+    mountInBackdrop((root) => {
+      let closed = false, cleanup = null;
+      import("./minigames/plotClaim.js").then(({ mountPlotClaim }) => {
+        if (!closed) cleanup = mountPlotClaim(root, { letters: zoneNote, onClose: closeModal });
+      });
+      return () => { closed = true; if (typeof cleanup === "function") cleanup(); };
+    });
     return;
   }
   if (key === "auth") {
-    mountInBackdrop((root) => mountAuthModal(root, { onClose: closeModal, openModal }));
+    mountInBackdrop((root) => {
+      let closed = false, cleanup = null;
+      import("./authModal.js").then(({ mountAuthModal }) => {
+        if (!closed) cleanup = mountAuthModal(root, { onClose: closeModal, openModal });
+      });
+      return () => { closed = true; if (typeof cleanup === "function") cleanup(); };
+    });
+    return;
+  }
+  if (ONLINE_GAMES[key]) {
+    mountInBackdrop((root) => {
+      let closed = false, cleanup = null;
+      ONLINE_GAMES[key]().then((mount) => {
+        if (!closed) cleanup = mount(root, { onClose: closeModal });
+      });
+      return () => { closed = true; if (typeof cleanup === "function") cleanup(); };
+    });
     return;
   }
   if (MINIGAMES[key]) {
@@ -1185,31 +1193,74 @@ function updatePlayerCountLabel() {
   playerCountEl.innerHTML = `<b>${count}</b> ${CAMPUS_META.mascot} on the Yard · free`;
 }
 
-// Auth state fires on every profile change (rename, equip), so presence and
-// the wallet listener only restart when the signed-in account itself changes.
 let presenceUid = null;
-onAuthChange(async (state) => {
-  authUser = state.user;
-  if (!ONLINE) return;
-  const uid = state.user?.uid ?? null;
-  if (uid !== presenceUid) {
-    if (presenceUid) {
-      leavePresence();
-      stopWatchingWallet();
+let online = null;
+let localRoom = "exterior";
+function roomKey(building, level) {
+  const type = interiorType(building);
+  return type ? `${type}-${level | 0}` : "exterior";
+}
+function publishRoom(room) {
+  localRoom = room;
+  online?.setMyRoom(room);
+  syncPeerMeshes();
+}
+
+async function startOnline() {
+  if (!ONLINE || online) return;
+  const [mp, auth, economy, firebase, firestore] = await Promise.all([
+    import("./multiplayer.js"),
+    import("./auth.js"),
+    import("./economy.js"),
+    import("./firebase.js"),
+    import("firebase/firestore"),
+  ]);
+  online = { ...mp, ...auth, ...economy };
+  startAchievementSync();
+  mp.setMyRoom(localRoom);
+  auth.onAuthChange(async (state) => {
+    authUser = state.user;
+    const uid = state.user?.uid ?? null;
+    if (uid !== presenceUid) {
+      if (presenceUid) {
+        mp.leavePresence();
+        economy.stopWatchingWallet();
+      }
+      presenceUid = uid;
+      if (uid) {
+        await mp.joinPresence(uid, state.profile);
+        mp.setMyRoom(localRoom);
+        economy.watchWallet(uid);
+      }
     }
-    presenceUid = uid;
-    if (uid) {
-      await joinPresence(uid, state.profile);
-      watchWallet(uid);
+    if (uid && state.profile) {
+      mp.setMyIdentity(state.profile.display_name || "Golden Lion", state.profile.color || "#f4b223");
+      torso.material.color.set(state.profile.color || "#f4b223");
     }
-  }
-  if (uid && state.profile) {
-    setMyIdentity(state.profile.display_name || "Golden Lion", state.profile.color || "#f4b223");
-    torso.material.color.set(state.profile.color || "#f4b223");
-  }
-  updateAuthButtons(state);
-  updatePlayerCountLabel();
-});
+    updateAuthButtons(state);
+    updatePlayerCountLabel();
+  });
+  economy.onBalanceChange((balance) => {
+    if (!authUser) {
+      walletBadgeEl.classList.add("hidden");
+      return;
+    }
+    walletBadgeEl.classList.remove("hidden");
+    walletBadgeEl.textContent = `Coins: ${balance}`;
+  });
+  mp.onPeersChange((updated) => {
+    peers = updated;
+    updatePlayerCountLabel();
+    syncPeerMeshes();
+  });
+  let notYetEnded = [];
+  const q = firestore.query(firestore.collection(firebase.db, "parties"), firestore.where("hidden", "==", false), firestore.where("endsAt", ">=", new Date()));
+  firestore.onSnapshot(q, (snap) => {
+    notYetEnded = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    syncLiveParties(notYetEnded.filter((p) => p.startsAt.toMillis() <= Date.now()));
+  });
+  setInterval(() => syncLiveParties(notYetEnded.filter((p) => p.startsAt.toMillis() <= Date.now())), 20000);
+}
 
 // Signed in: hide "Sign up", turn "Log in" into an account button.
 function updateAuthButtons(state) {
@@ -1221,25 +1272,17 @@ function updateAuthButtons(state) {
 }
 
 const walletBadgeEl = document.getElementById("wallet-badge");
-onBalanceChange((balance) => {
-  if (!ONLINE || !authUser) {
-    walletBadgeEl.classList.add("hidden");
-    return;
-  }
-  walletBadgeEl.classList.remove("hidden");
-  walletBadgeEl.textContent = `🪙 ${balance}`;
-});
 
-onPeersChange((updated) => {
-  peers = updated;
-  updatePlayerCountLabel();
+function syncPeerMeshes() {
+  const host = activeScene();
   const seen = new Set();
   peers.forEach((p, key) => {
+    const peerRoom = p.room || "exterior";
+    if (peerRoom !== localRoom) return;
     seen.add(key);
     let entry = peerMeshes.get(key);
     if (!entry) {
       const group = createCharacter({ shirt: p.color });
-      scene.add(group);
       const label = document.createElement("div");
       label.className = "peer-tag";
       label.textContent = p.name || "Golden Lion";
@@ -1247,20 +1290,27 @@ onPeersChange((updated) => {
       entry = { group, label };
       peerMeshes.set(key, entry);
     }
-    if (typeof p.x === "number") entry.group.position.set(p.x, 0, p.z);
+    if (entry.group.parent !== host) {
+      entry.group.parent?.remove(entry.group);
+      host.add(entry.group);
+    }
+    if (localRoom !== "exterior") entry.group.position.set(p.x || 0, 0, p.z || 0);
+    else {
+      if (typeof p.x === "number") entry.group.position.set(p.x, 0, p.z);
+    }
     if (typeof p.rotY === "number") entry.group.rotation.y = p.rotY;
     entry.group.userData.torso.material.color.set(p.color || "#f4b223");
     entry.label.textContent = p.name || "Golden Lion";
   });
   for (const [key, entry] of peerMeshes) {
     if (!seen.has(key)) {
-      scene.remove(entry.group);
+      entry.group.parent?.remove(entry.group);
       disposeCharacter(entry.group);
       entry.label.remove();
       peerMeshes.delete(key);
     }
   }
-});
+}
 
 function updatePeerLabels() {
   peerMeshes.forEach((entry) => {
@@ -1272,7 +1322,7 @@ function updatePeerLabels() {
     entry.label.style.transform = `translate(-50%, -100%)`;
     entry.label.style.left = x + "px";
     entry.label.style.top = y + "px";
-    entry.label.style.display = !currentRoom && pos.z < 1 ? "block" : "none";
+    entry.label.style.display = pos.z < 1 ? "block" : "none";
   });
 }
 
@@ -1322,20 +1372,6 @@ function syncLiveParties(parties) {
   });
 }
 
-if (ONLINE) {
-  // Only one inequality filter per Firestore query, so this fetches every
-  // not-yet-ended party (endsAt >= now) via onSnapshot, then filters down to
-  // "already started" client-side. A 20s re-check keeps catching parties
-  // that cross their start time between writes — onSnapshot alone only
-  // fires on document changes, not as time passes.
-  let notYetEnded = [];
-  const q = query(collection(db, "parties"), where("hidden", "==", false), where("endsAt", ">=", new Date()));
-  onSnapshot(q, (snap) => {
-    notYetEnded = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    syncLiveParties(notYetEnded.filter((p) => p.startsAt.toMillis() <= Date.now()));
-  });
-  setInterval(() => syncLiveParties(notYetEnded.filter((p) => p.startsAt.toMillis() <= Date.now())), 20000);
-}
 
 // ---- Loop ----
 const clock = new THREE.Clock();
@@ -1387,7 +1423,7 @@ function updateAvatar(dt) {
   camera.position.lerp(desiredCamPos, 1 - Math.exp(-8 * dt));
   camera.lookAt(avatar.position.x, avatar.position.y + 1, avatar.position.z);
 
-  if (!currentRoom) updateMyPosition(avatar.position.x, avatar.position.z, avatar.rotation.y);
+  online?.updateMyPosition(avatar.position.x, avatar.position.z, avatar.rotation.y);
 }
 
 function updateInteractionPrompt() {

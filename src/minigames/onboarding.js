@@ -1,4 +1,4 @@
-import { ONLINE } from '../firebase.js';
+import { ONLINE } from '../onlineConfig.js';
 export function mountOnboarding(root, { onClose } = {}) {
   root.innerHTML = `<div class="modal game-modal onboarding-modal">
     <h3>Find your way around UAPB</h3>
