@@ -1,5 +1,5 @@
 // DOM shell and pointer controls. The simulation owns camera and movement state.
-export function mountExperience({ online, onEnter, onCustomize, onZoom, onRotate, onReset, onMove, onNavigate, onRecover }) {
+export function mountExperience({ online, onEnter, onCustomize, onZoom, onRotate, onReset, onMove, onNavigate, onRecover, onQuality, qualityText }) {
   const app = document.getElementById('app');
   const topbar = document.querySelector('.topbar');
   const chips = document.querySelector('.chip-row');
@@ -10,6 +10,8 @@ export function mountExperience({ online, onEnter, onCustomize, onZoom, onRotate
   const navigate = document.createElement('button'); navigate.className = 'chip'; navigate.id = 'navigate-button'; navigate.textContent = 'Find a building'; navigate.onclick = () => { menu.open = false; onNavigate(); };
   const recover = document.createElement('button'); recover.className = 'chip'; recover.textContent = 'Return to Bell Tower'; recover.onclick = () => { menu.open = false; onRecover(); };
   const account = document.createElement('button'); account.className = 'chip'; account.dataset.modal = 'auth'; account.textContent = 'Account';
+  const quality = document.createElement('button'); quality.className = 'chip'; quality.id = 'quality-toggle'; quality.textContent = qualityText || 'Quality: Medium';
+  quality.onclick = () => { if (onQuality) quality.textContent = onQuality(); };
   const byModal = name => chips.querySelector(`[data-modal="${name}"]`);
   const byId = id => document.getElementById(id);
   const grouped = new Set();
@@ -17,7 +19,7 @@ export function mountExperience({ online, onEnter, onCustomize, onZoom, onRotate
     ['Explore', [navigate, recover, byModal('onboarding'), byId('night-toggle'), byId('weather-badge')]],
     ['Play', ['cards', 'stepshow', 'dominoes', 'pager', 'cookout', 'achievements'].map(byModal)],
     ['Community', ['king', 'plots', 'billboards', 'community', 'chat', 'leaderboard', 'store', 'parties'].map(byModal)],
-    ['Settings', [account, byId('install-chip'), byId('sound-toggle')]],
+    ['Settings', [account, quality, byId('install-chip'), byId('sound-toggle')]],
   ];
   for (const [, items] of groups) for (const item of items) if (item) grouped.add(item);
   // Any chip not named above stays reachable, in Explore, instead of being dropped.

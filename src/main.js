@@ -36,6 +36,7 @@ import { mountAchievements } from "./minigames/achievements.js";
 import { mountOnboarding } from "./minigames/onboarding.js";
 import { unlockAchievement, startAchievementSync } from "./achievements.js";
 import { ONLINE } from "./onlineConfig.js";
+import { readQuality, nextQuality, qualityLabel, applyQuality } from "./quality.js";
 
 // ---- Active campus (switchable via the 🏫 Campus chip; see src/campuses.js) ----
 const ACTIVE_CAMPUS = getActiveCampus();
@@ -60,8 +61,8 @@ const UAPB_BLACK = 0x121212;
 const app = document.getElementById("app");
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.shadowMap.enabled = true;
+let qualityLevel = readQuality();
+let qualityCaps = applyQuality(qualityLevel, { renderer });
 app.prepend(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -115,6 +116,7 @@ sun.shadow.camera.right = 80;
 sun.shadow.camera.top = 80;
 sun.shadow.camera.bottom = -80;
 scene.add(sun);
+qualityCaps = applyQuality(qualityLevel, { renderer, sun });
 
 const DAY_SKY = 0x8fd0f0;
 const NIGHT_SKY = 0x0b1030;
@@ -971,6 +973,12 @@ renderer.domElement.addEventListener('wheel', e => {
   e.preventDefault(); changeZoom(Math.sign(e.deltaY) * .08);
 }, { passive: false });
 mountExperience({ online: ONLINE,
+  qualityText: qualityLabel(qualityLevel),
+  onQuality: () => {
+    qualityLevel = nextQuality(qualityLevel);
+    qualityCaps = applyQuality(qualityLevel, { renderer, sun });
+    return qualityLabel(qualityLevel);
+  },
   onEnter: () => { enteredYard = true; startOnline(); },
   onCustomize: () => openModal('character'),
   onNavigate: () => { if (currentRoom) announceWorld('Exit the building to plan a campus route.'); else openModal('destinations'); },
@@ -1444,6 +1452,7 @@ function updateInteractionPrompt() {
 
 function animate() {
   requestAnimationFrame(animate);
+  if (document.hidden) { clock.getDelta(); return; }
   const dt = Math.min(clock.getDelta(), 0.1);
   const playerBefore = { x: avatar.position.x, z: avatar.position.z };
   updateAvatar(dt);
@@ -1462,7 +1471,7 @@ function animate() {
       }
     }
   }
-  pedestrians.update(dt);
+  if (qualityCaps.npc) pedestrians.update(dt);
   band?.update(clock.elapsedTime);
   if (isBoomboxPlaying() && Math.hypot(avatar.position.x - BB_X, avatar.position.z - BB_Z) > BOOMBOX_RANGE) {
     stopBoombox();
@@ -1477,7 +1486,7 @@ animate();
 
 if (import.meta.env.DEV && new URLSearchParams(location.search).has('test')) {
   window.__yardTest = {
-    state: () => ({ position: { x: avatar.position.x, z: avatar.position.z }, room: currentRoom?.type || null, level: currentRoom?.level, hitTime, cameraZoom: view.zoom, cameraYaw: view.yaw, route: navigation.route, colliders: (currentRoom?.world || world).shapes, doors: BUILDINGS.filter(b => b.enterable).map(b => ({ name: b.name, ...b.entrance })) }),
+    state: () => ({ position: { x: avatar.position.x, z: avatar.position.z }, room: currentRoom?.type || null, level: currentRoom?.level, hitTime, cameraZoom: view.zoom, cameraYaw: view.yaw, quality: qualityLevel, route: navigation.route, colliders: (currentRoom?.world || world).shapes, doors: BUILDINGS.filter(b => b.enterable).map(b => ({ name: b.name, ...b.entrance })) }),
     place: (x,z) => { avatar.position.set(x,0,z); clearInput(); },
     move: (dx,dz) => { const p = (currentRoom?.world || world).move(avatar.position, dx, dz, currentRoom?.bounds || campusBounds); avatar.position.x=p.x;avatar.position.z=p.z; },
     impact: () => { const c = traffic.cars[0]; const a=c.mesh.rotation.y; avatar.position.set(c.mesh.position.x+Math.sin(a)*1.3,0,c.mesh.position.z+Math.cos(a)*1.3); c.speed=4; impactCooldown=0; },
