@@ -90,24 +90,6 @@ export const ACTIVITY_SPOTS = {
   community: { x: -60, z: -5, label: "Union North Walk", confidence: "plaza" }
 };
 
-
-// Approximate campus loop road, threading the Bell Tower, Student Union,
-// HPER, and Administration — for ambient car traffic. Not surveyed, just a
-// plausible loop through the real building layout above.
-export const ROAD_ROUTE = [
-  { x: 10, z: -10 },
-  { x: -15, z: -16 },
-  { x: -60, z: -22 },
-  { x: -95, z: -85 },
-  { x: -123, z: -147 },
-  { x: -70, z: -115 },
-  { x: -20, z: -67 },
-  { x: 30, z: -45 },
-  { x: 60, z: -67 },
-  { x: 35, z: -25 },
-  { x: 10, z: -10 },
-];
-
 export const CAMPUS_META = {
   id: "uapb",
   label: "UAPB",

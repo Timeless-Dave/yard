@@ -19,12 +19,12 @@ corkboard, and Divine Nine plot claims, connect a free Firebase project:
    region).
 5. In **Build → Realtime Database**, create a database. This is separate
    from Firestore and is only used for live player positions (presence).
-6. Install the Firebase CLI (`npm install -g firebase-tools`), run
-   `firebase login`, then from this project's root:
+6. From `uapb-yard/` (the CLI is a local npm dependency; no global install):
    ```
-   firebase use --add        # pick your project, alias it "default"
-   firebase deploy --only firestore:rules,firestore:indexes,database
+   npx firebase-tools login
+   npx firebase-tools deploy --only firestore:rules,firestore:indexes,database --project yard-game
    ```
+   Put `VITE_FIREBASE_*` in `uapb-yard/.env.local` (gitignored). A copy in the parent folder is not read by Vite. Add the same keys in the Vercel project environment so production builds are not solo.
 7. In the `uapb-yard/` folder, create a file named `.env.local` from
    `.env.example`, filling in the Web app config values from step 2:
    ```

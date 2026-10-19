@@ -1,6 +1,5 @@
-// Ambient road network and looping car traffic, driven by a campus's
-// ROAD_ROUTE waypoint list (see campusData.*.js). Cars are simple
-// low-poly meshes that follow the loop at slightly different speeds.
+// Ambient road network and looping car traffic, driven by imported OSM
+// centerlines. Cars are simple low-poly meshes on driveable ways only.
 import * as THREE from "three";
 
 const CAR_COLORS = [0xcc2a2a, 0x2a4acc, 0xe8e2d0, 0x2a2a2a, 0xf4b223];
