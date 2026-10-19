@@ -42,6 +42,12 @@ button:focus-visible, summary:focus-visible, select:focus-visible, input:focus-v
 .landing h1 { font-size: clamp(36px, 5vw, 64px); line-height: 1.08; letter-spacing: -0.02em; margin: 12px 0 18px; }
 .landing-copy > p:not(.landing-note) { max-width: 380px; font-size: 17px; line-height: 1.5; color: #d2d8cf; }
 .landing #enter-yard { margin-top: 16px; padding: 14px 20px; min-width: 180px; text-align: center; font-size: 16px; }
+.landing-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+.landing-actions #enter-yard { margin-top: 0; }
+.landing-actions .btn { border-radius: 0; }
+.landing #customize-from-landing { padding: 14px 20px; min-width: 160px; text-align: center; font-size: 16px; }
+.chip:disabled { opacity: 0.55; cursor: not-allowed; }
+.chip:disabled:hover { border-color: rgba(255,255,255,0.15); }
 .landing-copy > p.landing-note { font-size: 12px; color: #b3bcb0; }
 .landing footer { font-size: 12px; color: #9eaa9a; }
 .at-landing > :not(canvas):not(.landing) { visibility: hidden; }

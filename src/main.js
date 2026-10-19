@@ -7,6 +7,8 @@ import { createInterior, interiorType } from './interiors.js';
 import { createCampusNavigation } from './mapNavigation.js';
 import { mountExperience } from './experience.js';
 import { createCameraController } from './cameraController.js';
+import { createInputController } from './inputController.js';
+import { createInteractionTarget } from './interactionTarget.js';
 import { mountCardGame } from "./minigames/cards.js";
 import { mountStepShow } from "./minigames/stepshow.js";
 import { mountDominoes } from "./minigames/dominoes.js";
@@ -88,7 +90,6 @@ const camera = new THREE.PerspectiveCamera(
 );
 const view = createCameraController();
 let enteredYard = false;
-let stickX = 0, stickZ = 0;
 let currentRoom = null, roomBuilding = null, exteriorPosition = null, exteriorCamera = null;
 let hitTime = 0, impactCooldown = 0, impactX = 0, impactZ = 0;
 function activeScene() { return currentRoom?.scene || scene; }
@@ -964,21 +965,18 @@ function recoverPosition() {
 }
 
 // ---- Input (keyboard + gamepad + touch) ----
-const keys = {};
-function isTyping(target) { return target?.closest?.('input, textarea, select, [contenteditable="true"]'); }
-function clearInput() { for (const key of Object.keys(keys)) keys[key] = false; stickX = stickZ = 0; }
-window.addEventListener('blur', clearInput);
-document.addEventListener('visibilitychange', () => { if (document.hidden) clearInput(); });
-window.addEventListener('keydown', e => {
-  if (isTyping(e.target) || modalIsOpen() || !enteredYard) return;
-  const key = e.key.toLowerCase();
-  if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(key)) e.preventDefault();
-  keys[key] = true;
-  if (key === '+' || key === '=') changeZoom(-.08);
-  if (key === '-') changeZoom(.08);
-  if (key === 'q') view.rotate(-.12);
-  if (key === 'r') view.rotate(.12);
-  if (key === '0') resetCamera();
+const input = createInputController({
+  isBlocked: () => !enteredYard || modalIsOpen(),
+  onZoom: changeZoom,
+  onRotate: amount => view.rotate(amount),
+  onReset: resetCamera,
+  onInteract: () => tryInteract(),
+});
+function clearInput() { input.clear(); }
+window.addEventListener('gamepadconnected', e => {
+  gamepadHintEl.style.display = 'block';
+  gamepadHintEl.textContent = `Controller connected: ${e.gamepad.id.slice(0, 28)}`;
+  setTimeout(() => (gamepadHintEl.style.display = 'none'), 2500);
 });
 renderer.domElement.addEventListener('wheel', e => {
   if (!enteredYard || modalIsOpen()) return;
@@ -990,80 +988,21 @@ mountExperience({ online: ONLINE,
   onNavigate: () => { if (currentRoom) announceWorld('Exit the building to plan a campus route.'); else openModal('destinations'); },
   onRecover: recoverPosition,
   onZoom: changeZoom, onRotate: amount => { view.rotate(amount); }, onReset: resetCamera,
-  onMove: (x, z) => { stickX = x; stickZ = z; }
+  onMove: (x, z) => input.setStick(x, z)
 });
-window.addEventListener("keyup", (e) => (keys[e.key.toLowerCase()] = false));
-
-document.querySelectorAll(".touch-btn[data-key]").forEach((btn) => {
+document.querySelectorAll('.touch-btn[data-key]').forEach(btn => {
   const k = btn.dataset.key;
-  const press = (e) => {
-    e.preventDefault();
-    keys[k] = true;
-  };
-  const release = (e) => {
-    e.preventDefault();
-    keys[k] = false;
-  };
-  btn.addEventListener("pointerdown", press);
-  btn.addEventListener("pointerup", release);
-  btn.addEventListener("pointerleave", release);
-  btn.addEventListener("pointercancel", release);
+  const press = e => { e.preventDefault(); input.setKey(k, true); };
+  const release = e => { e.preventDefault(); input.setKey(k, false); };
+  btn.addEventListener('pointerdown', press);
+  btn.addEventListener('pointerup', release);
+  btn.addEventListener('pointerleave', release);
+  btn.addEventListener('pointercancel', release);
 });
-document.getElementById("touch-interact")?.addEventListener("pointerdown", (e) => {
+document.getElementById('touch-interact')?.addEventListener('pointerdown', e => {
   e.preventDefault();
   tryInteract();
 });
-
-let gamepadIndex = null;
-window.addEventListener("gamepadconnected", (e) => {
-  gamepadIndex = e.gamepad.index;
-  gamepadHintEl.style.display = "block";
-  gamepadHintEl.textContent = `🎮 ${e.gamepad.id.slice(0, 28)} connected`;
-  setTimeout(() => (gamepadHintEl.style.display = "none"), 2500);
-});
-window.addEventListener("gamepaddisconnected", () => {
-  gamepadIndex = null;
-});
-const padButtonState = {};
-function pollGamepad() {
-  if (gamepadIndex === null) return { dx: 0, dz: 0, interact: false };
-  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-  const gp = pads[gamepadIndex];
-  if (!gp) return { dx: 0, dz: 0, interact: false };
-
-  const DEAD = 0.2;
-  let dx = Math.abs(gp.axes[0]) > DEAD ? gp.axes[0] : 0;
-  let dz = Math.abs(gp.axes[1]) > DEAD ? gp.axes[1] : 0;
-  const dpad = [
-    gp.buttons[12]?.pressed, // up
-    gp.buttons[13]?.pressed, // down
-    gp.buttons[14]?.pressed, // left
-    gp.buttons[15]?.pressed, // right
-  ];
-  if (dpad[0]) dz -= 1;
-  if (dpad[1]) dz += 1;
-  if (dpad[2]) dx -= 1;
-  if (dpad[3]) dx += 1;
-
-  const aPressed = !!gp.buttons[0]?.pressed;
-  const interact = aPressed && !padButtonState.a;
-  padButtonState.a = aPressed;
-
-  // Mirror D-pad presses as arrow-key events so minigames (e.g. step show)
-  // that already listen for keyboard arrows get gamepad input for free.
-  const arrowKeys = ["arrowup", "arrowdown", "arrowleft", "arrowright"];
-  dpad.forEach((pressed, i) => {
-    const k = arrowKeys[i];
-    if (pressed && !padButtonState[k]) {
-      window.dispatchEvent(new KeyboardEvent("keydown", { key: k }));
-    } else if (!pressed && padButtonState[k]) {
-      window.dispatchEvent(new KeyboardEvent("keyup", { key: k }));
-    }
-    padButtonState[k] = pressed;
-  });
-
-  return { dx, dz, interact };
-}
 
 const promptEl = document.createElement("div");
 promptEl.className = "interact-prompt";
@@ -1074,6 +1013,7 @@ gamepadHintEl.className = "gamepad-hint";
 app.appendChild(gamepadHintEl);
 
 let activeZone = null;
+const interactionTarget = createInteractionTarget();
 function modalIsOpen() {
   return modalRoot.children.length > 0;
 }
@@ -1085,10 +1025,6 @@ function tryInteract() {
   if (activeZone.key === 'room-info') { announceWorld(currentRoom.type === 'union' ? 'The renovated Union includes mail/print services, an elevator and an upstairs student lounge. This layout is a reconstruction.' : 'The library offers study spaces, research support and technology resources. This room is an illustrative layout.'); return; }
   openModal(activeZone.key, activeZone.note);
 }
-window.addEventListener("keydown", (e) => {
-  if (!isTyping(e.target) && e.key.toLowerCase() === "e") tryInteract();
-});
-
 // ---- Modals ----
 const modalContent = {
   billboards: {
@@ -1234,7 +1170,7 @@ function openModal(key, zoneNote) {
   });
 }
 document.querySelectorAll("[data-modal]").forEach((el) => {
-  el.addEventListener("click", () => openModal(el.dataset.modal));
+  el.addEventListener("click", () => { if (!el.disabled) openModal(el.dataset.modal); });
 });
 
 // ---- Auth + multiplayer wiring ----
@@ -1407,20 +1343,11 @@ const SPEED = 6;
 let lastMinimapUpdate = -1;
 
 function updateAvatar(dt) {
-  if (modalIsOpen() || !enteredYard) return;
   impactCooldown = Math.max(0, impactCooldown - dt);
   hitTime = Math.max(0, hitTime - dt);
-  let dx = 0,
-    dz = 0;
-  if (keys["w"] || keys["arrowup"]) dz -= 1;
-  if (keys["s"] || keys["arrowdown"]) dz += 1;
-  if (keys["a"] || keys["arrowleft"]) dx -= 1;
-  if (keys["d"] || keys["arrowright"]) dx += 1;
-
-  const pad = pollGamepad();
-  if (pad.interact) { tryInteract(); if (modalIsOpen()) return; }
-  dx += pad.dx + stickX;
-  dz += pad.dz + stickZ;
+  const intent = input.poll({ modalOpen: modalIsOpen() });
+  if (modalIsOpen() || !enteredYard) return;
+  let dx = intent.dx, dz = intent.dz;
   // Map screen directions into the current camera plane.
   const offset = cameraOffset();
   const heading = Math.atan2(offset.x, offset.z);
@@ -1436,7 +1363,7 @@ function updateAvatar(dt) {
     const len = Math.max(1, Math.hypot(dx, dz));
     dx /= len;
     dz /= len;
-    const speed = currentRoom ? 3.5 : keys.shift ? 10 : SPEED;
+    const speed = currentRoom ? 3.5 : intent.sprint ? 10 : SPEED;
     const next = (currentRoom?.world || world).move(avatar.position, dx * speed * dt, dz * speed * dt, currentRoom?.bounds || campusBounds, currentRoom ? [] : traffic.colliders());
     avatar.position.x = next.x; avatar.position.z = next.z;
     const targetAngle = Math.atan2(dx, dz);
@@ -1464,20 +1391,19 @@ function updateAvatar(dt) {
 }
 
 function updateInteractionPrompt() {
-  activeZone = null;
-  let nearest = Infinity;
-  for (const zone of (currentRoom ? currentRoom.zones : interactionZones)) {
-    const dist = Math.hypot(avatar.position.x - zone.x, avatar.position.z - zone.z);
-    if (dist < zone.radius && dist < nearest) { activeZone = zone; nearest = dist; }
-  }
-  const available = Boolean(activeZone && enteredYard && !modalIsOpen() && hitTime <= 0);
-  const touchButton = document.getElementById('touch-interact'); touchButton.disabled = !available;
-  touchButton.setAttribute('aria-label', available ? activeZone.label : 'No interaction nearby');
-  promptEl.style.display = available ? 'block' : 'none';
-  if (available) {
-    const btn = gamepadIndex !== null ? 'A' : 'E';
-    promptEl.textContent = `${matchMedia('(pointer: coarse)').matches ? 'Tap E' : 'Press ' + btn} · ${activeZone.label}`;
-  }
+  const zones = currentRoom ? currentRoom.zones : interactionZones;
+  activeZone = interactionTarget.pick(zones, avatar.position.x, avatar.position.z, activeZone);
+  const ui = interactionTarget.prompt(activeZone, {
+    entered: enteredYard,
+    modalOpen: modalIsOpen(),
+    stunned: hitTime > 0,
+    gamepad: input.gamepadIndex !== null,
+    coarse: matchMedia('(pointer: coarse)').matches,
+  });
+  const touchButton = document.getElementById('touch-interact'); touchButton.disabled = !ui.available;
+  touchButton.setAttribute('aria-label', ui.available ? ui.label : 'No interaction nearby');
+  promptEl.style.display = ui.available ? 'block' : 'none';
+  if (ui.available) promptEl.textContent = ui.text;
 }
 
 function animate() {

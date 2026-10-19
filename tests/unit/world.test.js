@@ -42,19 +42,32 @@ describe('physical campus', () => {
   });
 });
 
-describe("bell tower open arch", () => {
+describe("bell tower 4-way open base", () => {
   const cx = 7, cz = -3;
+  const r = 0.38;
   const world = createCollisionWorld(bellTowerColliders(cx, cz));
-  it("leaves the arch center walkable so people can pass under the tower", () => {
-    expect(world.clear(cx, cz, 0.38)).toBe(true);
-    // Full north-south transit through the arch stays clear end to end.
+  it("exposes four corner piers (not two)", () => {
+    expect(bellTowerColliders(cx, cz)).toHaveLength(4);
+  });
+  it("leaves the center walkable so people can stand under the tower", () => {
+    expect(world.clear(cx, cz, r)).toBe(true);
+  });
+  it("keeps the full N/S transit through the base clear", () => {
     for (let dz = -2; dz <= 2; dz += 0.25) {
-      expect(world.clear(cx, cz + dz, 0.38)).toBe(true);
+      expect(world.clear(cx, cz + dz, r)).toBe(true);
     }
   });
-  it("blocks the brick piers on either side of the arch", () => {
-    expect(world.clear(cx - 1.05, cz, 0.38)).toBe(false);
-    expect(world.clear(cx + 1.05, cz, 0.38)).toBe(false);
+  it("keeps the full E/W transit through the base clear", () => {
+    for (let dx = -2; dx <= 2; dx += 0.25) {
+      expect(world.clear(cx + dx, cz, r)).toBe(true);
+    }
+  });
+  it("blocks all four corner piers", () => {
+    const offset = 1.075;
+    expect(world.clear(cx - offset, cz - offset, r)).toBe(false);
+    expect(world.clear(cx + offset, cz - offset, r)).toBe(false);
+    expect(world.clear(cx - offset, cz + offset, r)).toBe(false);
+    expect(world.clear(cx + offset, cz + offset, r)).toBe(false);
   });
 });
 

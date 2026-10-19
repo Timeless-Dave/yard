@@ -221,25 +221,53 @@ export function createBellTower(scene, x, z) {
     return b;
   }
 
+  // Base: four brick corner piers plus an upper lintel band, so the open
+  // base reads as a real 4-way walk-through (N/S and E/W). The void beneath
+  // the lintel is visible from every side. No solid box here.
   let y = 0;
-  const s1 = stage(3.0, 5.5, 3.0, { withArch: true });
-  s1.position.y = y + 2.75;
-  y += 5.5;
-  // Base stage is modeled visually as a solid block but physically as two
-  // brick piers framing a walk-through arch along the local z axis. The
-  // auto-AABB collector would otherwise seal the arch, so skip this mesh and
-  // add explicit pier colliders beside it.
-  s1.userData.noCollision = true;
-  group.add(s1);
-  for (const shape of bellTowerColliders(x, z)) {
+  const baseH = 5.5;
+  const pierShapes = bellTowerColliders(x, z);
+  const basePierTex = brickTexture({ brick, rows: 14 });
+  for (const shape of pierShapes) {
     const pier = new THREE.Mesh(
-      new THREE.BoxGeometry(shape.w, 5.5, shape.d),
-      new THREE.MeshBasicMaterial({ visible: false })
+      new THREE.BoxGeometry(shape.w, baseH, shape.d),
+      new THREE.MeshStandardMaterial({ map: basePierTex })
     );
-    pier.position.set(shape.x - x, 2.75, shape.z - z);
+    pier.position.set(shape.x - x, baseH / 2, shape.z - z);
+    pier.castShadow = true;
+    pier.receiveShadow = true;
     pier.userData.collider = shape;
     group.add(pier);
   }
+  // Upper lintel band tying the four piers together. Lives entirely above
+  // 1.7m so the auto-AABB collector skips it; walk-through stays clear.
+  const outerSpan = 3.0;
+  const pierW = pierShapes[0].w;
+  const pierD = pierShapes[0].d;
+  const lintelH = 0.6;
+  const lintelY = baseH - lintelH / 2;
+  const lintelMat = new THREE.MeshStandardMaterial({ map: basePierTex });
+  for (const sign of [-1, 1]) {
+    const beam = new THREE.Mesh(
+      new THREE.BoxGeometry(outerSpan, lintelH, pierD),
+      lintelMat
+    );
+    beam.position.set(0, lintelY, sign * (outerSpan / 2 - pierD / 2));
+    beam.castShadow = true;
+    beam.userData.noCollision = true;
+    group.add(beam);
+  }
+  for (const sign of [-1, 1]) {
+    const beam = new THREE.Mesh(
+      new THREE.BoxGeometry(pierW, lintelH, outerSpan - 2 * pierD),
+      lintelMat
+    );
+    beam.position.set(sign * (outerSpan / 2 - pierW / 2), lintelY, 0);
+    beam.castShadow = true;
+    beam.userData.noCollision = true;
+    group.add(beam);
+  }
+  y += baseH;
 
   const b1 = band(3.3, 3.3);
   b1.position.y = y + 0.18;
@@ -976,14 +1004,18 @@ export function createFootprintBuilding(scene, building) {
 }
 
 // ---- Collider helpers (exported for unit tests and reuse) ----
-// Bell tower base is physically two brick piers framing a walk-through arch
-// along the local z axis. These shapes are world-space AABBs matching the
-// pier footprints; the gap between them is the arch opening (~1.2m wide).
+// Bell tower base is a true 4-way open base: four brick corner piers framing
+// walk-through openings on both the N/S and E/W axes. These shapes are
+// world-space AABBs matching the pier footprints. With a player radius of
+// 0.38 the center stays clear and both transits remain passable; the piers
+// themselves block, and the outer footprint still spans a 3.0m square.
 export function bellTowerColliders(cx, cz) {
-  const pierW = 0.9, pierD = 3.0, offset = 1.05; // 0.6m half-arch + 0.45 pier half-width
+  const pierW = 0.85, pierD = 0.85, offset = 1.075; // outer edge at ±1.5
   return [
-    { x: cx - offset, z: cz, w: pierW, d: pierD },
-    { x: cx + offset, z: cz, w: pierW, d: pierD },
+    { x: cx - offset, z: cz - offset, w: pierW, d: pierD },
+    { x: cx + offset, z: cz - offset, w: pierW, d: pierD },
+    { x: cx - offset, z: cz + offset, w: pierW, d: pierD },
+    { x: cx + offset, z: cz + offset, w: pierW, d: pierD },
   ];
 }
 

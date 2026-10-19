@@ -30,6 +30,18 @@ export function mountExperience({ online, onEnter, onCustomize, onZoom, onRotate
     for (const item of items) if (item) row.append(item);
     section.append(heading, row); chips.append(section);
   }
+  if (!online) {
+    for (const name of ['king', 'plots', 'billboards', 'community', 'chat', 'leaderboard', 'store', 'parties']) {
+      const chip = byModal(name);
+      if (!chip) continue;
+      chip.disabled = true;
+      chip.title = 'Sign in after you add Firebase config';
+    }
+    for (const name of ['cards', 'stepshow', 'dominoes', 'pager', 'cookout', 'achievements']) {
+      const chip = byModal(name);
+      if (chip) chip.disabled = false;
+    }
+  }
   menu.addEventListener('click', e => { if (e.target.closest('button[data-modal]')) menu.open = false; });
   document.addEventListener('pointerdown', e => { if (!menu.contains(e.target)) menu.open = false; });
   const customize = document.createElement('button'); customize.className = 'btn btn-primary'; customize.textContent = 'My character'; customize.id = 'character-button'; customize.onclick = onCustomize; topbar.append(customize);
@@ -59,8 +71,10 @@ export function mountExperience({ online, onEnter, onCustomize, onZoom, onRotate
   toggle.onclick = () => { const hidden = touch.classList.toggle('collapsed'); toggle.textContent = hidden ? 'Show movement' : 'Hide movement'; toggle.setAttribute('aria-expanded', String(!hidden)); reset(); };
   app.append(toggle);
   const landing = document.createElement('section'); landing.className = 'landing'; landing.setAttribute('aria-label', 'Welcome to The Yard');
-  landing.innerHTML = `<div class="landing-brand">The Yard<span>University of Arkansas at Pine Bluff</span></div><div class="landing-copy"><h1>Walk UAPB campus.</h1><p>Homecoming games, mapped roads, and buildings you can enter.</p><button class="btn btn-primary" id="enter-yard">Enter campus</button><p class="landing-note">${online ? 'Play solo, or sign in for multiplayer.' : 'Play solo. No account needed.'}</p></div><footer>Unofficial UAPB campus game.</footer>`;
+  landing.innerHTML = `<div class="landing-brand">The Yard<span>University of Arkansas at Pine Bluff</span></div><div class="landing-copy"><h1>Walk UAPB campus.</h1><p>Homecoming games, mapped roads, and buildings you can enter.</p><div class="landing-actions"><button class="btn btn-primary" id="enter-yard">Enter campus</button><button class="btn btn-secondary" id="customize-from-landing">Edit character</button></div><p class="landing-note">${online ? 'Play solo, or sign in for multiplayer.' : 'Play solo. No account needed.'}</p></div><footer>Unofficial UAPB campus game.</footer>`;
   app.append(landing); app.classList.add('at-landing');
-  document.getElementById('enter-yard').onclick = () => { landing.remove(); app.classList.remove('at-landing'); onEnter(); customize.focus(); };
+  const enter = () => { landing.remove(); app.classList.remove('at-landing'); onEnter(); };
+  document.getElementById('enter-yard').onclick = () => { enter(); customize.focus(); };
+  document.getElementById('customize-from-landing').onclick = () => { enter(); onCustomize(); };
   document.addEventListener('keydown', e => { if (e.key === 'Escape') menu.open = false; });
 }
