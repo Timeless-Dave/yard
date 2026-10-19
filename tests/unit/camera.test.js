@@ -68,9 +68,19 @@ describe('camera controller', () => {
     camera.rotate(1);
     camera.zoomBy(0.5);
 
-    expect(camera.reset()).toEqual({ yaw: 0, zoom: 1 });
+    expect(camera.reset()).toEqual({ yaw: 0, zoom: 1, mode: 'orbit' });
     expect(camera.yaw).toBe(0);
     expect(camera.zoom).toBe(1);
     expect(camera.offsetFor(false)).toEqual({ x: 0, y: 6, z: 8 });
+  });
+
+  it('top preset looks down from above after damping', () => {
+    const camera = createCameraController();
+    camera.setPreset('top');
+    camera.damp(10);
+    const offset = camera.offsetFor(false);
+    expect(camera.mode).toBe('top');
+    expect(offset.y).toBeGreaterThan(20);
+    expect(Math.abs(offset.x)).toBeLessThan(0.1);
   });
 });

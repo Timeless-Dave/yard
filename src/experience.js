@@ -1,5 +1,5 @@
 // DOM shell and pointer controls. The simulation owns camera and movement state.
-export function mountExperience({ online, onEnter, onCustomize, onZoom, onRotate, onReset, onMove, onNavigate, onRecover, onQuality, qualityText }) {
+export function mountExperience({ online, onEnter, onCustomize, onZoom, onRotate, onReset, onMove, onNavigate, onRecover, onQuality, qualityText, onMap, onTopView }) {
   const app = document.getElementById('app');
   const topbar = document.querySelector('.topbar');
   const chips = document.querySelector('.chip-row');
@@ -8,6 +8,7 @@ export function mountExperience({ online, onEnter, onCustomize, onZoom, onRotate
   topbar.insertBefore(menu, chips); menu.append(chips);
   document.getElementById('campus-switch')?.remove();
   const navigate = document.createElement('button'); navigate.className = 'chip'; navigate.id = 'navigate-button'; navigate.textContent = 'Find a building'; navigate.onclick = () => { menu.open = false; onNavigate(); };
+  const mapChip = document.createElement('button'); mapChip.className = 'chip'; mapChip.textContent = 'Map'; mapChip.onclick = () => { menu.open = false; onMap?.(); };
   const recover = document.createElement('button'); recover.className = 'chip'; recover.textContent = 'Return to Bell Tower'; recover.onclick = () => { menu.open = false; onRecover(); };
   const account = document.createElement('button'); account.className = 'chip'; account.dataset.modal = 'auth'; account.textContent = 'Account';
   const quality = document.createElement('button'); quality.className = 'chip'; quality.id = 'quality-toggle'; quality.textContent = qualityText || 'Quality: Medium';
@@ -16,7 +17,7 @@ export function mountExperience({ online, onEnter, onCustomize, onZoom, onRotate
   const byId = id => document.getElementById(id);
   const grouped = new Set();
   const groups = [
-    ['Explore', [navigate, recover, byModal('onboarding'), byId('night-toggle'), byId('weather-badge')]],
+    ['Explore', [navigate, mapChip, recover, byModal('onboarding'), byId('night-toggle'), byId('weather-badge')]],
     ['Play', ['cards', 'stepshow', 'dominoes', 'pager', 'cookout', 'achievements'].map(byModal)],
     ['Community', ['king', 'plots', 'billboards', 'community', 'chat', 'leaderboard', 'store', 'parties'].map(byModal)],
     ['Settings', [account, quality, byId('install-chip'), byId('sound-toggle')]],
@@ -48,10 +49,10 @@ export function mountExperience({ online, onEnter, onCustomize, onZoom, onRotate
   document.addEventListener('pointerdown', e => { if (!menu.contains(e.target)) menu.open = false; });
   const customize = document.createElement('button'); customize.className = 'btn btn-primary'; customize.textContent = 'My character'; customize.id = 'character-button'; customize.onclick = onCustomize; topbar.append(customize);
   document.querySelector('.bottom-card').innerHTML = `<div class="label" id="player-count-label">${online ? 'Connecting to the Yard' : 'Solo, UAPB campus'}</div>`;
-  document.querySelector('.hint').innerHTML = '<b>WASD / arrows</b> move, <b>E</b> interact<br><b>+ / -</b> zoom, <b>Q / R</b> rotate, <b>0</b> reset view';
+  document.querySelector('.hint').innerHTML = '<b>WASD / arrows</b> move, <b>E</b> interact<br><b>+ / -</b> zoom, <b>Q / R</b> rotate, <b>0</b> follow, tap map to pan';
   const controls = document.createElement('details'); controls.className = 'camera-controls'; controls.open = true;
-  controls.innerHTML = '<summary>Camera</summary><div><button aria-label="Zoom in">+</button><button aria-label="Zoom out">−</button><button aria-label="Rotate camera left">↶</button><button aria-label="Rotate camera right">↷</button><button aria-label="Reset camera">Reset</button></div>';
-  const actions = [() => onZoom(-.12), () => onZoom(.12), () => onRotate(-Math.PI / 8), () => onRotate(Math.PI / 8), onReset];
+  controls.innerHTML = '<summary>Camera</summary><div><button aria-label="Zoom in">+</button><button aria-label="Zoom out">−</button><button aria-label="Rotate camera left">↶</button><button aria-label="Rotate camera right">↷</button><button aria-label="Top-down view">Top</button><button aria-label="Reset camera">Follow</button></div>';
+  const actions = [() => onZoom(-.12), () => onZoom(.12), () => onRotate(-Math.PI / 8), () => onRotate(Math.PI / 8), () => onTopView?.(), onReset];
   controls.querySelectorAll('button').forEach((b, i) => b.onclick = actions[i]); app.append(controls);
   const touch = document.getElementById('touch-controls');
   const joystick = document.createElement('div'); joystick.className = 'joystick'; joystick.setAttribute('aria-label', 'Drag to move; keyboard users use WASD'); joystick.innerHTML = '<span></span>';

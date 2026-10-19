@@ -2,11 +2,14 @@ const TAU = Math.PI * 2;
 
 export const CAMERA_ZOOM_MIN = 0.55;
 export const CAMERA_ZOOM_MAX = 1.8;
+export const CAMERA_TOP_ZOOM_MIN = 0.35;
+export const CAMERA_TOP_ZOOM_MAX = 3.2;
 
 export const CAMERA_PRESETS = Object.freeze({
-  close: Object.freeze({ yaw: 0, zoom: 0.7 }),
-  follow: Object.freeze({ yaw: 0, zoom: 1 }),
-  overview: Object.freeze({ yaw: 0, zoom: 1.6 }),
+  close: Object.freeze({ yaw: 0, zoom: 0.7, mode: "orbit" }),
+  follow: Object.freeze({ yaw: 0, zoom: 1, mode: "orbit" }),
+  overview: Object.freeze({ yaw: 0, zoom: 1.6, mode: "orbit" }),
+  top: Object.freeze({ yaw: 0, zoom: 1.1, mode: "top" }),
 });
 
 const OUTDOOR_OFFSET = Object.freeze({ x: 0, y: 6, z: 8 });
@@ -33,14 +36,18 @@ export function createCameraController(options = {}) {
   const zoomDamping = options.zoomDamping ?? 10;
   const obstructionPadding = options.obstructionPadding ?? 0.25;
 
+  let mode = options.mode === "top" ? "top" : "orbit";
   let targetYaw = wrapAngle(options.yaw ?? CAMERA_PRESETS.follow.yaw);
   let targetZoom = clamp(
     options.zoom ?? CAMERA_PRESETS.follow.zoom,
-    CAMERA_ZOOM_MIN,
-    CAMERA_ZOOM_MAX,
+    zoomMin(),
+    zoomMax(),
   );
   let currentYaw = targetYaw;
   let currentZoom = targetZoom;
+
+  function zoomMin() { return mode === "top" ? CAMERA_TOP_ZOOM_MIN : CAMERA_ZOOM_MIN; }
+  function zoomMax() { return mode === "top" ? CAMERA_TOP_ZOOM_MAX : CAMERA_ZOOM_MAX; }
 
   const controller = {
     presets: CAMERA_PRESETS,
@@ -57,8 +64,11 @@ export function createCameraController(options = {}) {
     },
     set zoom(value) {
       if (Number.isFinite(value)) {
-        targetZoom = clamp(value, CAMERA_ZOOM_MIN, CAMERA_ZOOM_MAX);
+        targetZoom = clamp(value, zoomMin(), zoomMax());
       }
+    },
+    get mode() {
+      return mode;
     },
 
     get currentYaw() {
@@ -81,17 +91,19 @@ export function createCameraController(options = {}) {
     setPreset(name) {
       const preset = CAMERA_PRESETS[name];
       if (!preset) throw new RangeError(`Unknown camera preset: ${name}`);
+      mode = preset.mode || "orbit";
       targetYaw = preset.yaw;
-      targetZoom = preset.zoom;
-      return { yaw: targetYaw, zoom: targetZoom };
+      targetZoom = clamp(preset.zoom, zoomMin(), zoomMax());
+      return { yaw: targetYaw, zoom: targetZoom, mode };
     },
 
     reset() {
+      mode = "orbit";
       targetYaw = CAMERA_PRESETS.follow.yaw;
       targetZoom = CAMERA_PRESETS.follow.zoom;
       currentYaw = targetYaw;
       currentZoom = targetZoom;
-      return { yaw: targetYaw, zoom: targetZoom };
+      return { yaw: targetYaw, zoom: targetZoom, mode };
     },
 
     damp(dt) {
@@ -106,6 +118,9 @@ export function createCameraController(options = {}) {
     },
 
     offsetFor(indoors = false) {
+      if (mode === "top") {
+        return { x: 0, y: (indoors ? 22 : 42) * currentZoom, z: 0.35 * currentZoom };
+      }
       const base = indoors ? INDOOR_OFFSET : OUTDOOR_OFFSET;
       const sin = Math.sin(currentYaw);
       const cos = Math.cos(currentYaw);

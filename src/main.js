@@ -4,6 +4,9 @@ import { createCharacter, loadLook, disposeCharacter, loadCharacterAssets } from
 import { mountCharacterEditor } from './characterEditor.js';
 import { createCollisionWorld, collidersFromMeshes, sweptVehicleContact } from './worldPhysics.js';
 import { createInterior, interiorType } from './interiors.js';
+import { accessFor, hallForBuilding, visitationLabel } from './housing.js';
+import { onBalanceChange } from './economy.js';
+import { mountHousing } from './minigames/housing.js';
 import { createCampusNavigation } from './mapNavigation.js';
 import { mountExperience } from './experience.js';
 import { createCameraController } from './cameraController.js';
@@ -415,7 +418,7 @@ BUILDINGS.forEach((b) => {
   createAcademicHall(scene, { x: b.x, z: b.z, w: b.w, h: b.h, d: b.d, label: b.name, brick: b.color });
 });
 
-const minimap = initMinimap(document.getElementById("minimap"), { xMin: X_MIN, xMax: X_MAX, zMin: Z_MIN, zMax: Z_MAX, buildings: BUILDINGS, roads: MAP_ROADS });
+let navigation;
 
 // Render the pinned OpenStreetMap centerlines, not the old fictional loop.
 const roadSurfaces = createMappedRoadNetwork(scene, MAP_ROADS);
@@ -895,7 +898,8 @@ for (const building of BUILDINGS) {
   if (building.enterable && building.entrance) {
     const marker = new THREE.Mesh(new THREE.TorusGeometry(.65, .07, 6, 24), new THREE.MeshBasicMaterial({ color: '#f4b223' }));
     marker.rotation.x = Math.PI / 2; marker.position.set(building.entrance.x, .12, building.entrance.z); scene.add(marker);
-    interactionZones.push({ ...building.entrance, radius: 2.6, key: 'enter-building', label: `Enter ${building.name}`, building });
+    const dorm = building.kind === 'dorm';
+    interactionZones.push({ ...building.entrance, radius: 2.6, key: 'enter-building', label: dorm ? `Housing: ${building.name}` : `Enter ${building.name}`, building });
   }
 }
 const statusEl = document.createElement('div'); statusEl.className = 'world-status hidden'; statusEl.setAttribute('role', 'status'); app.append(statusEl);
@@ -932,14 +936,18 @@ loadCharacterAssets().then(() => {
 }
 camera.lookAt(avatar.position);
 
-const navigation = createCampusNavigation({ scene, world, bounds: campusBounds, roads: MAP_ROADS, buildings: BUILDINGS, getPosition: () => exteriorPosition || avatar.position, onClose: () => closeModal() });
-function enterBuilding(building, level = 0) {
+navigation = createCampusNavigation({ scene, world, bounds: campusBounds, roads: MAP_ROADS, buildings: BUILDINGS, getPosition: () => exteriorPosition || avatar.position, onClose: () => closeModal() });
+const minimap = initMinimap(document.getElementById("minimap"), {
+  xMin: X_MIN, xMax: X_MAX, zMin: Z_MIN, zMax: Z_MAX, buildings: BUILDINGS, roads: MAP_ROADS,
+  onSelect: (building) => { if (navigation.choose(building)) minimap.collapse(); },
+});
+function enterBuilding(building, level = 0, mode = 'lobby') {
   if (!interiorType(building)) return;
   clearInput();
   if (!currentRoom) { exteriorPosition = avatar.position.clone(); exteriorCamera = { zoom: view.zoom, yaw: view.yaw }; scene.remove(avatar); }
   else { currentRoom.scene.remove(avatar); currentRoom.dispose(); }
-  currentRoom = createInterior(building, level); roomBuilding = building;
-  publishRoom(roomKey(building, level));
+  currentRoom = createInterior(building, level, mode); roomBuilding = building;
+  publishRoom(roomKey(building, level, mode));
   avatar.position.set(currentRoom.spawn.x, 0, currentRoom.spawn.z); avatar.rotation.set(0, Math.PI, 0); currentRoom.scene.add(avatar);
   view.yaw = 0; view.zoom = 1.1; view.damp(10); hitTime = 0;
   const indoor = view.offsetFor(true);
@@ -991,6 +999,8 @@ mountExperience({ online: ONLINE,
   onEnter: () => { enteredYard = true; startOnline(); },
   onCustomize: () => openModal('character'),
   onNavigate: () => { if (currentRoom) announceWorld('Exit the building to plan a campus route.'); else openModal('destinations'); },
+  onMap: () => { if (currentRoom) announceWorld('Exit the building to open the campus map.'); else minimap.expand(); },
+  onTopView: () => view.setPreset('top'),
   onRecover: recoverPosition,
   onZoom: changeZoom, onRotate: amount => { view.rotate(amount); }, onReset: resetCamera,
   onMove: (x, z) => input.setStick(x, z)
@@ -1024,10 +1034,25 @@ function modalIsOpen() {
 }
 function tryInteract() {
   if (!enteredYard || !activeZone || modalIsOpen() || hitTime > 0) return;
-  if (activeZone.key === 'enter-building') { enterBuilding(activeZone.building); return; }
+  if (activeZone.key === 'enter-building') {
+    const building = activeZone.building;
+    if (building.kind === 'dorm') {
+      const access = accessFor(building);
+      if (access.mode === 'room') enterBuilding(building, 0, 'room');
+      else openModal('housing', building);
+      return;
+    }
+    enterBuilding(building);
+    return;
+  }
   if (activeZone.key === 'exit-building') { exitBuilding(); return; }
+  if (activeZone.key === 'housing-desk') { openModal('housing', roomBuilding); return; }
   if (activeZone.key === 'floor-change') { enterBuilding(roomBuilding, currentRoom.level ? 0 : 1); return; }
-  if (activeZone.key === 'room-info') { announceWorld(currentRoom.type === 'union' ? 'The renovated Union includes mail/print services, an elevator and an upstairs student lounge. This layout is a reconstruction.' : 'The library offers study spaces, research support and technology resources. This room is an illustrative layout.'); return; }
+  if (activeZone.key === 'room-info') {
+    if (currentRoom.type === 'dorm') announceWorld(`${visitationLabel()} ${hallForBuilding(roomBuilding)?.note || ''} Interiors are illustrative.`);
+    else announceWorld(currentRoom.type === 'union' ? 'The renovated Union includes mail/print services, an elevator and an upstairs student lounge. This layout is a reconstruction.' : 'The library offers study spaces, research support and technology resources. This room is an illustrative layout.');
+    return;
+  }
   openModal(activeZone.key, activeZone.note);
 }
 // ---- Modals ----
@@ -1138,6 +1163,14 @@ function openModal(key, zoneNote) {
   clearInput();
   playOpen();
   if (key === 'destinations') { mountInBackdrop(root => navigation.mount(root)); return; }
+  if (key === 'housing') {
+    mountInBackdrop(root => mountHousing(root, {
+      building: zoneNote,
+      onClose: closeModal,
+      onEnter: (mode) => { closeModal(); enterBuilding(zoneNote, 0, mode); },
+    }));
+    return;
+  }
   if (key === 'character') {
     mountInBackdrop(root => mountCharacterEditor(root, { look: currentLook, onSave: applyLook, onClose: closeModal }));
     return;
@@ -1213,8 +1246,9 @@ function updatePlayerCountLabel() {
 let presenceUid = null;
 let online = null;
 let localRoom = "exterior";
-function roomKey(building, level) {
+function roomKey(building, level, mode = "lobby") {
   const type = interiorType(building);
+  if (type === "dorm") return `dorm-${hallForBuilding(building)?.id || "hall"}-${mode}`;
   return type ? `${type}-${level | 0}` : "exterior";
 }
 function publishRoom(room) {
@@ -1251,20 +1285,15 @@ async function startOnline() {
       }
     }
     if (uid && state.profile) {
-      mp.setMyIdentity(state.profile.display_name || "Golden Lion", state.profile.color || "#f4b223");
+      lastDisplayName = state.profile.display_name || "You";
+      selfTag.textContent = lastDisplayName;
+      mp.setMyIdentity(lastDisplayName, state.profile.color || "#f4b223");
       torso.material.color.set(state.profile.color || "#f4b223");
     }
     updateAuthButtons(state);
     updatePlayerCountLabel();
   });
-  economy.onBalanceChange((balance) => {
-    if (!authUser) {
-      walletBadgeEl.classList.add("hidden");
-      return;
-    }
-    walletBadgeEl.classList.remove("hidden");
-    walletBadgeEl.textContent = `Coins: ${balance}`;
-  });
+  economy.onBalanceChange(paintWallet);
   mp.onPeersChange((updated) => {
     peers = updated;
     updatePlayerCountLabel();
@@ -1289,6 +1318,18 @@ function updateAuthButtons(state) {
 }
 
 const walletBadgeEl = document.getElementById("wallet-badge");
+function paintWallet(balance) {
+  walletBadgeEl.classList.remove("hidden");
+  walletBadgeEl.textContent = `${balance} Yard Coin`;
+}
+onBalanceChange(paintWallet);
+
+const selfTag = document.createElement("div");
+selfTag.className = "peer-tag me";
+selfTag.textContent = "You";
+app.appendChild(selfTag);
+let lastDisplayName = "You";
+selfTag.textContent = lastDisplayName;
 
 function syncPeerMeshes() {
   const host = activeScene();
@@ -1329,17 +1370,24 @@ function syncPeerMeshes() {
   }
 }
 
+function placeNameTag(el, world, extraY = 2.5) {
+  const pos = world.clone();
+  pos.y += extraY;
+  pos.project(camera);
+  const onScreen = pos.z < 1 && pos.x > -1.2 && pos.x < 1.2 && pos.y > -1.4 && pos.y < 1.4;
+  el.style.display = onScreen ? "block" : "none";
+  if (!onScreen) return;
+  el.style.left = (pos.x * 0.5 + 0.5) * window.innerWidth + "px";
+  el.style.top = (-pos.y * 0.5 + 0.5) * window.innerHeight + "px";
+}
+
 function updatePeerLabels() {
+  selfTag.textContent = lastDisplayName;
+  placeNameTag(selfTag, avatar.position);
   peerMeshes.forEach((entry) => {
-    const pos = entry.group.position.clone();
-    pos.y += 2.6;
-    pos.project(camera);
-    const x = (pos.x * 0.5 + 0.5) * window.innerWidth;
-    const y = (-pos.y * 0.5 + 0.5) * window.innerHeight;
-    entry.label.style.transform = `translate(-50%, -100%)`;
-    entry.label.style.left = x + "px";
-    entry.label.style.top = y + "px";
-    entry.label.style.display = pos.z < 1 ? "block" : "none";
+    const dist = Math.hypot(entry.group.position.x - camera.position.x, entry.group.position.z - camera.position.z);
+    entry.label.style.opacity = String(Math.max(0, 1 - (dist - 18) / 70));
+    placeNameTag(entry.label, entry.group.position);
   });
 }
 
@@ -1431,14 +1479,15 @@ function updateAvatar(dt) {
   }
   view.damp(dt);
   const look = cameraOffset();
-  const pulled = view.pullForObstruction(
+  const desired = { x: avatar.position.x + look.x, y: avatar.position.y + look.y, z: avatar.position.z + look.z };
+  const pulled = view.mode === "top" ? desired : view.pullForObstruction(
     { x: avatar.position.x, y: avatar.position.y + 1.2, z: avatar.position.z },
-    { x: avatar.position.x + look.x, y: avatar.position.y + look.y, z: avatar.position.z + look.z },
+    desired,
     raycastCamera
   );
   desiredCamPos.set(pulled.x, pulled.y, pulled.z);
   camera.position.lerp(desiredCamPos, 1 - Math.exp(-8 * dt));
-  camera.lookAt(avatar.position.x, avatar.position.y + 1, avatar.position.z);
+  camera.lookAt(avatar.position.x, avatar.position.y + (view.mode === "top" ? 0.2 : 1), avatar.position.z);
 
   online?.updateMyPosition(avatar.position.x, avatar.position.z, avatar.rotation.y);
 }

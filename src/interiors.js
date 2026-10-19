@@ -6,7 +6,10 @@ import { createCollisionWorld } from './worldPhysics.js';
 //   union_cantilever -> 'union'   (photo-referenced reconstruction)
 //   library          -> 'library' (illustrative layout, no interior photos)
 export function interiorType(building) {
-  return building.special === 'union_cantilever' ? 'union' : building.special === 'library' ? 'library' : null;
+  if (building.special === 'union_cantilever') return 'union';
+  if (building.special === 'library') return 'library';
+  if (building.kind === 'dorm') return 'dorm';
+  return null;
 }
 
 const ROOM_NOTES = {
@@ -16,6 +19,9 @@ const ROOM_NOTES = {
   library: ['ABOUT THIS ROOM',
     'Illustrative layout, not based on interior photos.',
     'The real floor plan is not verified.'],
+  dorm: ['ABOUT THIS ROOM',
+    'Illustrative hall. Not a real UAPB floor plan.',
+    'Lease here is Yard Coin only, not a housing contract.'],
 };
 
 function wrapLines(ctx, text, maxWidth) {
@@ -28,7 +34,7 @@ function wrapLines(ctx, text, maxWidth) {
   return out;
 }
 
-export function createInterior(building, level = 0) {
+export function createInterior(building, level = 0, mode = 'lobby') {
   const type = interiorType(building), scene = new THREE.Scene();
   scene.background = new THREE.Color('#d2d7d6');
   scene.add(new THREE.HemisphereLight('#ffffff', '#a09179', 2.3));
@@ -139,7 +145,7 @@ export function createInterior(building, level = 0) {
       floorSign(ROOM_NOTES.union, -6, 7, 8, 2.8, 'paper');
       zones.push({ x: -6, z: 5.5, radius: 2, key: 'cards', label: 'Play Spades in the lounge' });
     }
-  } else {
+  } else if (type === 'library') {
     box(7, .85, 4, 6, 1.7, 1.2, '#a3815b'); box(7, 1.5, 3.1, 6, 3, .1, '#d6d2c7');
     sign('LIBRARY SERVICES', 7, 2.6, 3.17, 4.6);
     for (const x of [-10, -6, -2]) {
@@ -159,18 +165,43 @@ export function createInterior(building, level = 0) {
     sign(name, 1, 3.3, -9.7, 7);
     floorSign(ROOM_NOTES.library, -6, 7, 8, 2.8, 'paper');
     zones.push({ x: 6, z: 6, radius: 1.7, key: 'room-info', label: 'Library resources and study spaces' });
+  } else if (type === 'dorm') {
+    const room = mode === 'room';
+    const honor = /johnson|j\.?b\.?j/i.test(String(building.name || ''));
+    box(9.5, 1.1, -7.2, 6, 2.2, 3.2, '#3d4442');
+    sign('FRONT DESK', 9.5, 2.5, -5.5, 4);
+    sofa(-7, 2); table(-7, 3.6, 2, .8);
+    chair(4, 4, 'w'); chair(4, 6, 'w');
+    sign(name, 0, 3.3, -9.7, 8);
+    sign(room ? 'LEASED ROOM · ILLUSTRATIVE' : 'VISITOR LOBBY · CHECK IN', -6, 3.2, -9.7, 6);
+    floorSign(ROOM_NOTES.dorm, -6, 7, 8, 2.8, 'paper');
+    zones.push({ x: 9.5, z: -4.2, radius: 1.8, key: 'housing-desk', label: room ? 'Housing desk' : 'Lease a room or check hours' });
+    zones.push({ x: -6, z: 5.5, radius: 1.8, key: 'room-info', label: 'Residential Life hours' });
+    if (room) {
+      box(-8, .45, -5, 4.2, .4, 2.2, '#6b4a2b');
+      box(-8, .7, -5.7, 4.2, .9, .2, '#6b4a2b', false);
+      box(2, .45, -5, 4.2, .4, 2.2, '#6b4a2b');
+      box(2, .7, -5.7, 4.2, .9, .2, '#6b4a2b', false);
+      table(-3, 1.2, 1.4, .7); chair(-3, 2.2, 's');
+      if (honor) {
+        box(10, .9, 4, 3.2, .12, 1.6, '#b58b5b');
+        sign('SUITE KITCHEN', 10, 2.2, 4.9, 3.4);
+      }
+    }
   }
   const world = createCollisionWorld(shapes);
-  const title = building.name || (type === 'union' ? 'Student Union' : 'Library');
+  const title = building.name || (type === 'union' ? 'Student Union' : type === 'dorm' ? 'Residence hall' : 'Library');
   const labels = {
     union: `${title}: ${level ? 'Upstairs lounge' : 'Ground-floor lobby'}`,
     library: `${title}: Study floor`,
+    dorm: `${title}: ${mode === 'room' ? 'Leased room' : 'Lobby'}`,
   };
   const confidence = {
     union: 'Photo-referenced reconstruction; room dimensions are approximate.',
     library: 'Illustrative study interior; actual floor plan not verified.',
+    dorm: 'Illustrative hall. Visiting hours follow the Residential Life handbook in campus time. This is not a real lease.',
   };
-  return { scene, world, zones, spawn, level, type, bounds: { xMin: -13.5, xMax: 13.5, zMin: -9.5, zMax: 9.5 },
+  return { scene, world, zones, spawn, level, type, mode, bounds: { xMin: -13.5, xMax: 13.5, zMin: -9.5, zMax: 9.5 },
     label: labels[type] || `${title}: Interior`,
     confidence: confidence[type] || 'Illustrative interior.',
     dispose() { const gs = new Set(), ms = new Set(), ts = new Set(); scene.traverse(n => { if (n.isMesh) { gs.add(n.geometry); ms.add(n.material); if (n.material.map) ts.add(n.material.map); } }); gs.forEach(g => g.dispose()); ms.forEach(m => m.dispose()); ts.forEach(t => t.dispose()); }

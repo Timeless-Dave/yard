@@ -26,7 +26,15 @@ button:focus-visible, summary:focus-visible, select:focus-visible, input:focus-v
 .camera-controls { position: absolute; right: 20px; top: 240px; z-index: 4; background: #171b18ed; border: 1px solid #ffffff26; color: #fff; border-radius: 0; width: 125px; }
 .camera-controls > div { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 0 8px 8px; }
 .camera-controls button { min-height: 44px; color: white; background: #30362f; border: 0; border-radius: 0; cursor: pointer; }
-.camera-controls button:last-child { grid-column: span 2; font-size: 12px; }
+.camera-controls button:nth-child(n+5) { font-size: 12px; }
+.campus-map { position: absolute; inset: 0; z-index: 8; display: grid; grid-template-rows: auto 1fr auto; background: #101410f2; color: #fff; }
+.campus-map.hidden { display: none; }
+.campus-map header, .campus-map footer { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 12px 16px; background: #171b18; }
+.campus-map header strong { margin-right: auto; }
+.campus-map canvas { width: 100%; height: 100%; touch-action: none; cursor: grab; background: #121612; }
+.campus-map footer { font-size: 12px; color: #c2c8bd; justify-content: space-between; }
+.coin-toast { position: absolute; left: 50%; bottom: 140px; transform: translateX(-50%); z-index: 7; pointer-events: none; background: #171b18ed; color: #f4b223; border: 1px solid #f4b223; padding: 10px 16px; font-weight: 700; }
+.peer-tag.me { border: 1px solid #f4b223; }
 .touch-controls { display: flex; position: absolute; left: 20px; right: 20px; bottom: 100px; justify-content: space-between; align-items: end; pointer-events: none; z-index: 4; }
 .touch-controls .touch-dpad { display: none; }
 .touch-controls.collapsed { display: none; }
@@ -129,7 +137,8 @@ button:focus-visible, summary:focus-visible, select:focus-visible, input:focus-v
 .corkboard-card, .hopscotch-sq, .step-btn, .pager-screen, .pager-timebar,
 .cook-bar, .dom-chain, .report-reason, .room-bar, .route-status,
 .destination-row, .destination-modal input, .character-preview,
-.character-editor select, .character-editor input {
+.character-editor select, .character-editor input,
+.campus-map, .campus-map header, .campus-map footer, .coin-toast {
   border-radius: 0;
 }
 .joystick, .joystick span, .step-ring { border-radius: 50%; }
